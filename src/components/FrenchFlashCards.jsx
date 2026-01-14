@@ -844,6 +844,7 @@ export default function FrenchFlashCardsApp() {
   const [tempApiKey, setTempApiKey] = useState('');
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [apiKeyError, setApiKeyError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Функция валидации Gemini API ключа
   const validateApiKey = (key) => {
@@ -859,9 +860,9 @@ export default function FrenchFlashCardsApp() {
       return 'Invalid API Key format. Must start with "AIza"';
     }
     
-    // Проверка минимальной длины
-    if (trimmedKey.length < 40) {
-      return 'API Key is too short';
+    // Проверка минимальной длины (достаточно 35 символов для Gemini ключа)
+    if (trimmedKey.length < 35) {
+      return 'API Key is too short (minimum 35 characters)';
     }
     
     return '';
@@ -2224,47 +2225,92 @@ export default function FrenchFlashCardsApp() {
                       <path d="M280-400q-33 0-56.5-23.5T200-480q0-33 23.5-56.5T280-560q33 0 56.5 23.5T360-480q0 33-23.5 56.5T280-400Zm0 160q-100 0-170-70T40-480q0-100 70-170t170-70q67 0 121.5 33t86.5 87h352l120 120-180 180-80-60-80 60-85-60h-47q-32 54-86.5 87T280-240Zm0-80q56 0 98.5-34t56.5-86h125l58 41 82-61 71 55 75-75-40-40H435q-14-52-56.5-86T280-640q-66 0-113 47t-47 113q0 66 47 113t113 47Z"/>
                     </svg>
                   </div>
-                  {/* Input */}
-                  <input
-                    type="password"
-                    value={tempApiKey}
-                    onChange={(e) => {
-                      setTempApiKey(e.target.value);
-                      setApiKeyError(''); // Очищаем ошибку при вводе
-                    }}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        const error = validateApiKey(tempApiKey);
-                        if (!error) {
-                          localStorage.setItem('gemini_api_key', tempApiKey);
-                          setApiKey(tempApiKey);
-                          setShowApiKeyModal(false);
-                          setApiKeyError('');
-                          setTempApiKey('');
-                        } else {
-                          setApiKeyError(error);
+                  
+                  {/* Input Container */}
+                  <div style={{
+                    flex: 1,
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                    {/* Input */}
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={tempApiKey}
+                      onChange={(e) => {
+                        setTempApiKey(e.target.value);
+                        setApiKeyError(''); // Очищаем ошибку при вводе
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          const error = validateApiKey(tempApiKey);
+                          if (!error) {
+                            localStorage.setItem('gemini_api_key', tempApiKey);
+                            setApiKey(tempApiKey);
+                            setShowApiKeyModal(false);
+                            setApiKeyError('');
+                            setTempApiKey('');
+                            setShowPassword(false);
+                          } else {
+                            setApiKeyError(error);
+                          }
                         }
-                      }
-                    }}
-                    placeholder="Starts with Alza"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      height: '56px',
-                      padding: '0 20px',
-                      border: apiKeyError ? '1.5px solid #DC2626' : '1.5px solid rgba(0, 0, 0, 0.12)',
-                      boxSizing: 'border-box',
-                      fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      lineHeight: '24px',
-                      borderRadius: '12px',
-                      backgroundColor: '#ffffff',
-                      color: '#000000',
-                      colorScheme: 'light',
-                      outline: 'none',
-                    }}
-                  />
+                      }}
+                      placeholder="Starts with Alza"
+                      style={{
+                        width: '100%',
+                        height: '56px',
+                        padding: '0 50px 0 20px',
+                        border: apiKeyError ? '1.5px solid #DC2626' : '1.5px solid rgba(0, 0, 0, 0.12)',
+                        boxSizing: 'border-box',
+                        fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                        fontSize: '16px',
+                        fontWeight: '500',
+                        lineHeight: '24px',
+                        borderRadius: '12px',
+                        backgroundColor: '#ffffff',
+                        color: '#000000',
+                        colorScheme: 'light',
+                        outline: 'none',
+                      }}
+                    />
+                    
+                    {/* Show/Hide Password Button - Inside Input */}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        transition: 'opacity 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => e.target.style.opacity = '0.6'}
+                      onMouseLeave={(e) => e.target.style.opacity = '1'}
+                    >
+                      {showPassword ? (
+                        // Eye icon (show password)
+                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
+                          <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
+                        </svg>
+                      ) : (
+                        // Eye off icon (hide password)
+                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
+                          <path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Error message */}
@@ -2301,6 +2347,7 @@ export default function FrenchFlashCardsApp() {
                     setShowApiKeyModal(false);
                     setApiKeyError('');
                     setTempApiKey('');
+                    setShowPassword(false);
                     hideKeyboard();
                   }
                 }}
@@ -2334,6 +2381,7 @@ export default function FrenchFlashCardsApp() {
                   setShowApiKeyModal(false);
                   setTempApiKey('');
                   setApiKeyError('');
+                  setShowPassword(false);
                   hideKeyboard();
                 }}
                 style={{
