@@ -853,12 +853,18 @@ export default function FrenchFlashCardsApp() {
 
     let conjugationText = '';
     if (partOfSpeechMatch) {
-      conjugationText += `Часть речи: ${partOfSpeechMatch[1].trim()}\n`;
-      setEditablePartOfSpeech(partOfSpeechMatch[1].trim());
+      let partOfSpeech = partOfSpeechMatch[1].trim();
+      // Берём только первое слово (первую часть речи)
+      partOfSpeech = partOfSpeech.split(/[\s\n,;/]+/)[0];
+      conjugationText += `Часть речи: ${partOfSpeech}\n`;
+      setEditablePartOfSpeech(partOfSpeech);
     }
     if (genderMatch) {
-      conjugationText += `Род: ${genderMatch[1].trim()}\n`;
-      setEditableTypeOfWord(genderMatch[1].trim());
+      let gender = genderMatch[1].trim();
+      // Берём только первое значение (м/ж/-)
+      gender = gender.split(/[\s\n,;/]+/)[0];
+      conjugationText += `Род: ${gender}\n`;
+      setEditableTypeOfWord(gender);
     }
     if (formsMatch) {
       conjugationText += `\n${formsMatch[1].trim()}`;
@@ -919,7 +925,9 @@ export default function FrenchFlashCardsApp() {
         const formsMatch = responseText.match(/ФОРМЫ:\s*(.+?)$/s);
 
         if (frenchMatch) {
-          const frenchWord = frenchMatch[1].trim();
+          let frenchWord = frenchMatch[1].trim();
+          // Берём только первое слово (отбрасываем остальное)
+          frenchWord = frenchWord.split(/[\s\n,;:]+/)[0].toLowerCase();
           setNewFrench(frenchWord);
           setNewRussian(inputWord);
         } else {
@@ -967,7 +975,9 @@ export default function FrenchFlashCardsApp() {
         const translationMatch = responseText.match(/ПЕРЕВОД:\s*(.+?)(?=\nЧАСТЬ|$)/s);
 
         if (translationMatch) {
-          const translation = translationMatch[1].trim();
+          let translation = translationMatch[1].trim();
+          // Берём только первый перевод (если их несколько, разделены запятой или точкой)
+          translation = translation.split(/[,;\/]/)[0].trim();
           setNewRussian(translation);
         } else {
           throw new Error('Could not parse translation from response');
