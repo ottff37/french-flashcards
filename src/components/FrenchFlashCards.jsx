@@ -775,9 +775,9 @@ export default function FrenchFlashCardsApp() {
   // Загрузка всех тем
   const loadTopics = async () => {
     try {
-      const result = await window.storage.get('french-topics');
-      if (result && result.value) {
-        const data = JSON.parse(result.value);
+      const result = localStorage.getItem('french-topics');
+      if (result) {
+        const data = JSON.parse(result);
         setTopics(data);
       }
     } catch (error) {
@@ -789,17 +789,17 @@ export default function FrenchFlashCardsApp() {
   // Сохранение тем в storage
   const saveTopics = async (updatedTopics) => {
     try {
-      await window.storage.set('french-topics', JSON.stringify(updatedTopics));
+      localStorage.setItem('french-topics', JSON.stringify(updatedTopics));
     } catch (error) {
       console.error('Ошибка сохранения:', error);
     }
   };
 
   // Helper функция для обновления topics
-  const updateTopics = async (updatedTopics) => {
+  const updateTopics = (updatedTopics) => {
     console.log('updateTopics called with:', updatedTopics);
     setTopics(updatedTopics);
-    await saveTopics(updatedTopics);
+    saveTopics(updatedTopics);
     console.log('Topics saved and state updated');
   };
 
@@ -1170,7 +1170,7 @@ export default function FrenchFlashCardsApp() {
         
         // Обновляем в списке всех топиков
         const updatedTopics = topics.map(t => t.id === currentTopic.id ? updatedTopic : t);
-        await updateTopics(updatedTopics);
+        updateTopics(updatedTopics);
         setCurrentTopic(updatedTopic);
         
         addSuccess(`Imported ${wordsToAdd.length} word${wordsToAdd.length !== 1 ? 's' : ''}!`);
@@ -1209,7 +1209,7 @@ export default function FrenchFlashCardsApp() {
           const newTopics = [...topics, imported.topic];
           console.log('New topics count will be:', newTopics.length);
           
-          await updateTopics(newTopics);
+          updateTopics(newTopics);
           addSuccess(`Successfully imported topic: ${imported.topic.name}!`);
         } 
         // Формат с words - создаём новый топик из слов
@@ -1223,14 +1223,14 @@ export default function FrenchFlashCardsApp() {
           };
           
           const newTopics = [...topics, newTopic];
-          await updateTopics(newTopics);
+          updateTopics(newTopics);
           addSuccess(`Successfully imported topic: ${topicName}!`);
         }
         // Fallback для старого формата (массив топиков)
         else if (imported.topics && Array.isArray(imported.topics)) {
           console.log('Multiple topics detected (old format), adding to list');
           const mergedTopics = [...topics, ...imported.topics];
-          await updateTopics(mergedTopics);
+          updateTopics(mergedTopics);
           addSuccess(`Successfully imported ${imported.topics.length} topic${imported.topics.length !== 1 ? 's' : ''}!`);
         } 
         else {
@@ -2505,6 +2505,8 @@ export default function FrenchFlashCardsApp() {
                       lineHeight: '24px',
                       letterSpacing: '0%',
                       color: '#000000',
+                      backgroundColor: '#ffffff',
+                      colorScheme: 'light',
                       outline: 'none',
                       boxSizing: 'border-box',
                       textTransform: 'capitalize'
@@ -2544,6 +2546,8 @@ export default function FrenchFlashCardsApp() {
                       lineHeight: '24px',
                       letterSpacing: '0%',
                       color: '#000000',
+                      backgroundColor: '#ffffff',
+                      colorScheme: 'light',
                       outline: 'none',
                       boxSizing: 'border-box',
                       textTransform: 'capitalize'
