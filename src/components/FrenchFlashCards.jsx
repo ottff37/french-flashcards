@@ -672,6 +672,11 @@ export default function FrenchFlashCardsApp() {
   const [editableTypeOfWord, setEditableTypeOfWord] = useState('');
   const [searchInput, setSearchInput] = useState('');
   
+  // API Key states
+  const [apiKey, setApiKey] = useState('');
+  const [tempApiKey, setTempApiKey] = useState('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  
   // States для настроек типографии карточек
   const [cardFontFamily, setCardFontFamily] = useState('Geist');
   const [cardFontWeight, setCardFontWeight] = useState('500');
@@ -685,6 +690,14 @@ export default function FrenchFlashCardsApp() {
   // Загрузка данных из storage при загрузке
   useEffect(() => {
     loadTopics();
+    
+    // Загружаем API ключ
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+    } else {
+      setShowApiKeyModal(true);
+    }
   }, []);
 
   // Глобальные обработчики для drag-drop на странице
@@ -711,20 +724,26 @@ export default function FrenchFlashCardsApp() {
 
   // Helper функция для запроса к Claude API напрямую
   const callGeminiAPI = async (prompt) => {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1024,
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      })
-    });
+    if (!apiKey) {
+      throw new Error('API key not set. Please enter your Gemini API key.');
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -732,7 +751,7 @@ export default function FrenchFlashCardsApp() {
     }
 
     const data = await response.json();
-    return data.content[0].text;
+    return data.candidates[0].content.parts[0].text;
   };
 
   // ========== NOTIFICATION HELPERS ==========
@@ -1560,6 +1579,152 @@ export default function FrenchFlashCardsApp() {
 
     return (
       <div className="min-h-screen py-28 px-8" style={{ backgroundColor: '#F6F2F2' }}>
+        {/* API Key Modal */}
+        {showApiKeyModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: 'white',
+              borderRadius: '24px',
+              padding: '40px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            }}>
+              <h2 style={{
+                fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                fontSize: '24px',
+                fontWeight: '600',
+                marginTop: 0,
+                marginBottom: '20px'
+              }}>
+                🔑 Gemini API Key
+              </h2>
+              
+              <p style={{
+                fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                fontSize: '14px',
+                color: '#666',
+                marginBottom: '20px'
+              }}>
+                This app needs a Gemini API key to translate and analyze French words.
+              </p>
+
+              <div style={{
+                fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                marginBottom: '20px'
+              }}>
+                <p style={{
+                  fontSize: '13px',
+                  color: '#666',
+                  marginBottom: '10px',
+                  fontWeight: '600'
+                }}>
+                  How to get your free API key:
+                </p>
+                <ol style={{
+                  fontSize: '13px',
+                  color: '#666',
+                  paddingLeft: '20px',
+                  margin: 0
+                }}>
+                  <li>Go to <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#4285f4', textDecoration: 'none' }}>makersuite.google.com/app/apikey</a></li>
+                  <li>Click "Create API Key"</li>
+                  <li>Copy the key (starts with AIza)</li>
+                  <li>Paste it below</li>
+                </ol>
+              </div>
+
+              <input
+                type="password"
+                placeholder="Paste your API key here..."
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    if (tempApiKey.trim()) {
+                      localStorage.setItem('gemini_api_key', tempApiKey);
+                      setApiKey(tempApiKey);
+                      setShowApiKeyModal(false);
+                    }
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0',
+                  fontSize: '13px',
+                  marginBottom: '20px',
+                  boxSizing: 'border-box',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                }}
+              />
+
+              <button
+                onClick={() => {
+                  if (tempApiKey.trim()) {
+                    localStorage.setItem('gemini_api_key', tempApiKey);
+                    setApiKey(tempApiKey);
+                    setShowApiKeyModal(false);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#4285f4',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                }}
+              >
+                Save API Key
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Change API Key Button (Top Right) */}
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          zIndex: 100
+        }}>
+          <button
+            onClick={() => {
+              setTempApiKey(apiKey);
+              setShowApiKeyModal(true);
+            }}
+            style={{
+              padding: '10px 16px',
+              background: '#f0f0f0',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontWeight: '500'
+            }}
+          >
+            🔑 Change API Key
+          </button>
+        </div>
+
         <div className="max-w-2xl mx-auto flex flex-col items-center">
           {/* Заголовок */}
           <h1 style={{
