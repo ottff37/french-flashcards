@@ -119,6 +119,29 @@ if (typeof document !== 'undefined') {
       border-radius: 20px !important;
     }
     
+    /* Fix autofill transparency issue */
+    input[type="password"]:-webkit-autofill,
+    input[type="password"]:-webkit-autofill:hover,
+    input[type="password"]:-webkit-autofill:focus {
+      -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+      box-shadow: 0 0 0 1000px #ffffff inset !important;
+    }
+    
+    input[type="password"]:-webkit-autofill {
+      -webkit-text-fill-color: #000000 !important;
+    }
+    
+    /* Fix selection text color */
+    input[type="password"]::selection {
+      background-color: rgba(0, 0, 0, 0.1);
+      color: #000000;
+    }
+    
+    input[type="password"]::-moz-selection {
+      background-color: rgba(0, 0, 0, 0.1);
+      color: #000000;
+    }
+    
     .api-key-input-wrapper {
       /* margin-bottom removed */
     }
