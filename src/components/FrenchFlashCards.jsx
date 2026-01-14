@@ -72,16 +72,40 @@ if (typeof document !== 'undefined') {
       transition: all 0.3s ease;
     }
     
-    @keyframes slideUp {
-      from {
-        opacity: 0;
-        transform: translateY(120px);
+    /* Celebration Modal Styles */
+    .celebration-modal-overlay {
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    
+    .celebration-modal-content {
+      width: 100%;
+      padding: 16px;
+    }
+    
+    /* API Key Modal Styles */
+    .api-key-modal-overlay {
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    
+    .api-key-modal-content {
+      width: 100%;
+      padding: 16px;
+    }
+    
+    @media (min-width: 769px) {
+      .celebration-modal-content {
+        width: 480px !important;
+        padding: 48px 32px !important;
       }
-      to {
-        opacity: 1;
-        transform: translateY(0);
+      
+      .api-key-modal-content {
+        width: 480px !important;
+        padding: 48px 32px !important;
       }
     }
+    
     
     @media (max-width: 900px) {
       .sidebar-buttons-container {
@@ -1581,62 +1605,74 @@ export default function FrenchFlashCardsApp() {
       <div className="min-h-screen py-28 px-8" style={{ backgroundColor: '#F6F2F2' }}>
         {/* API Key Modal */}
         {showApiKeyModal && (
-          <div style={{
+          <div className="api-key-modal-overlay" style={{
             position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000
+            zIndex: 1000,
           }}>
-            <div style={{
-              background: 'white',
+            <div className="api-key-modal-content" style={{
+              backgroundColor: '#ffffff',
               borderRadius: '24px',
-              padding: '40px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
             }}>
+              {/* Key Icon */}
+              <div style={{ marginBottom: '32px', fontSize: '80px' }}>
+                🔑
+              </div>
+
+              {/* Title */}
               <h2 style={{
                 fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                fontSize: '24px',
-                fontWeight: '600',
-                marginTop: 0,
-                marginBottom: '20px'
+                fontSize: '32px',
+                fontWeight: '500',
+                lineHeight: '40px',
+                marginBottom: '16px',
+                color: '#000000',
+                textAlign: 'center',
               }}>
-                🔑 Gemini API Key
+                Gemini API Key
               </h2>
-              
+
+              {/* Subtitle */}
               <p style={{
                 fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                fontSize: '14px',
-                color: '#666',
-                marginBottom: '20px'
+                fontSize: '16px',
+                fontWeight: '400',
+                lineHeight: '26px',
+                color: 'rgba(0, 0, 0, 0.6)',
+                marginBottom: '32px',
               }}>
                 This app needs a Gemini API key to translate and analyze French words.
               </p>
 
+              {/* Instructions */}
               <div style={{
                 fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                marginBottom: '20px'
+                marginBottom: '24px',
+                textAlign: 'left',
               }}>
                 <p style={{
                   fontSize: '13px',
-                  color: '#666',
-                  marginBottom: '10px',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  color: '#000000',
+                  marginBottom: '12px',
                 }}>
                   How to get your free API key:
                 </p>
                 <ol style={{
                   fontSize: '13px',
-                  color: '#666',
+                  color: 'rgba(0, 0, 0, 0.6)',
                   paddingLeft: '20px',
-                  margin: 0
+                  margin: 0,
+                  lineHeight: '22px',
                 }}>
                   <li>Go to <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#4285f4', textDecoration: 'none' }}>makersuite.google.com/app/apikey</a></li>
                   <li>Click "Create API Key"</li>
@@ -1645,6 +1681,7 @@ export default function FrenchFlashCardsApp() {
                 </ol>
               </div>
 
+              {/* Input */}
               <input
                 type="password"
                 placeholder="Paste your API key here..."
@@ -1663,17 +1700,19 @@ export default function FrenchFlashCardsApp() {
                   width: '100%',
                   padding: '12px',
                   borderRadius: '8px',
-                  border: '1px solid #e0e0e0',
-                  fontSize: '13px',
+                  border: '1px solid rgba(0, 0, 0, 0.12)',
+                  fontSize: '14px',
                   marginBottom: '20px',
                   boxSizing: 'border-box',
                   fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   backgroundColor: '#ffffff',
                   color: '#000000',
-                  colorScheme: 'light'
+                  colorScheme: 'light',
+                  outline: 'none'
                 }}
               />
 
+              {/* Save Button */}
               <button
                 onClick={() => {
                   if (tempApiKey.trim()) {
@@ -1684,16 +1723,20 @@ export default function FrenchFlashCardsApp() {
                 }}
                 style={{
                   width: '100%',
-                  padding: '12px',
-                  background: '#4285f4',
-                  color: 'white',
+                  padding: '16px 20px',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
                   border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
+                  borderRadius: '12px',
+                  fontSize: '16px',
                   fontWeight: '600',
+                  lineHeight: '24px',
                   cursor: 'pointer',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  transition: 'background-color 0.2s',
                 }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
               >
                 Save API Key
               </button>
@@ -2039,7 +2082,7 @@ export default function FrenchFlashCardsApp() {
 
       {/* Celebration Modal */}
       {showCelebrationModal && (
-        <div style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -2051,11 +2094,9 @@ export default function FrenchFlashCardsApp() {
           justifyContent: 'center',
           zIndex: 1000,
         }}>
-          <div style={{
+          <div className="celebration-modal-content" style={{
             backgroundColor: '#ffffff',
             borderRadius: '24px',
-            width: '480px',
-            padding: '48px 32px',
             textAlign: 'center',
             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
           }}>
