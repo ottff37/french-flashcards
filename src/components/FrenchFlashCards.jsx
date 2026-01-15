@@ -833,29 +833,15 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
               }}
             >
               <td 
-                className="text-left font-semibold"
+                className="text-left"
+                dangerouslySetInnerHTML={{ __html: `<span style="font-weight: 600;">${form.pronoun}</span> | <span>${highlighted}</span>` }}
                 style={{
                   backgroundColor: 'rgba(0, 0, 0, 0.04)',
                   borderTopLeftRadius: isFirst ? '16px' : '0',
-                  borderBottomLeftRadius: isLast ? '16px' : '0',
-                  borderLeft: '2px solid rgba(0, 0, 0, 0.08)',
-                  borderRight: '2px solid rgba(0, 0, 0, 0.08)',
-                  borderTop: isFirst ? '2px solid rgba(0, 0, 0, 0.08)' : 'none',
-                  borderBottom: '2px solid rgba(0, 0, 0, 0.08)',
-                  padding: '12px 16px',
-                  width: '100px',
-                  boxSizing: 'border-box',
-                  textTransform: 'capitalize'
-                }}
-              >
-                {form.pronoun}
-              </td>
-              <td 
-                className="text-left"
-                dangerouslySetInnerHTML={{ __html: highlighted }}
-                style={{
                   borderTopRightRadius: isFirst ? '16px' : '0',
+                  borderBottomLeftRadius: isLast ? '16px' : '0',
                   borderBottomRightRadius: isLast ? '16px' : '0',
+                  borderLeft: '2px solid rgba(0, 0, 0, 0.08)',
                   borderRight: '2px solid rgba(0, 0, 0, 0.08)',
                   borderTop: isFirst ? '2px solid rgba(0, 0, 0, 0.08)' : 'none',
                   borderBottom: '2px solid rgba(0, 0, 0, 0.08)',
@@ -1012,14 +998,8 @@ const ConjugationTable = ({ conjugation, word }) => {
           return (
             <tr key={idx} className="border-b border-gray-300">
               <td 
-                className="py-4 px-4 text-left font-semibold bg-green-600"
-                style={{ width: '100px', boxSizing: 'border-box' }}
-              >
-                {form.pronoun}
-              </td>
-              <td 
-                className="py-4 px-4 text-left" 
-                dangerouslySetInnerHTML={{ __html: highlighted }}
+                className="py-4 px-4 text-left"
+                dangerouslySetInnerHTML={{ __html: `<span style="font-weight: 600; color: #16a34a;">${form.pronoun}</span> | <span>${highlighted}</span>` }}
               />
             </tr>
           );
