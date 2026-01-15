@@ -3776,7 +3776,7 @@ export default function FrenchFlashCardsApp() {
 
             {/* Горизонтальный слайдер с карточками */}
             <div
-              className="overflow-hidden rounded-2xl relative mobile-614 mobile-slider"
+              className="overflow-hidden rounded-2xl relative mobile-614 mobile-slider flex items-center justify-center"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -3792,7 +3792,16 @@ export default function FrenchFlashCardsApp() {
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              style={{ cursor: isDragging ? 'grabbing' : 'grab', width: '614px', height: '560px', touchAction: 'pan-y', userSelect: 'none' }}
+              style={{ 
+                cursor: isDragging ? 'grabbing' : 'grab', 
+                width: '614px', 
+                height: '560px', 
+                touchAction: 'pan-y', 
+                userSelect: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               {/* Контейнер слайдера */}
               <div
@@ -3802,6 +3811,9 @@ export default function FrenchFlashCardsApp() {
                   transitionDuration: isDragging ? '0ms' : '300ms',
                   transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
                   gap: '16px',
+                  width: '100%',
+                  display: 'flex',
+                  flexDirection: 'row',
                 }}
               >
                 {cards.map((card, idx) => (
@@ -3812,7 +3824,9 @@ export default function FrenchFlashCardsApp() {
                     style={{
                       padding: '0 16px',
                       boxSizing: 'border-box',
-                      userSelect: 'none'
+                      userSelect: 'none',
+                      minWidth: '100%',
+                      minHeight: '100%',
                     }}
                   >
                     <div
