@@ -55,6 +55,13 @@ if (typeof document !== 'undefined') {
       user-select: none;
     }
     
+    .topic-item {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    
     .back-button-sidebar, .export-button-sidebar, .import-button-sidebar {
       width: 56px;
       height: 56px;
@@ -1664,36 +1671,52 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicTouchMove = (e, topicId) => {
-    if (!touchDragTopicId) return;
+    if (!touchDragTopicId) {
+      return;
+    }
     
-    const currentY = e.touches[0].clientY;
+    e.preventDefault();
     
-    // Находим элемент под пальцем
-    const allTopicElements = Array.from(document.querySelectorAll('.topic-item'));
-    for (let element of allTopicElements) {
-      const rect = element.getBoundingClientRect();
-      if (currentY >= rect.top && currentY <= rect.bottom) {
-        const hoveredId = element.getAttribute('data-topic-id');
-        
-        // Сразу меняем порядок как в примере
-        if (hoveredId && hoveredId !== touchDragTopicId) {
-          const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
-          const targetIndex = topics.findIndex(t => t.id === hoveredId);
+    try {
+      const currentY = e.touches[0].clientY;
+      
+      const topicsList = document.querySelector('.topic-list-container');
+      if (!topicsList) return;
+      
+      const allTopicElements = Array.from(topicsList.querySelectorAll('.topic-item'));
+      let foundElement = false;
+      
+      for (let element of allTopicElements) {
+        const rect = element.getBoundingClientRect();
+        if (currentY >= rect.top && currentY <= rect.bottom) {
+          foundElement = true;
+          const hoveredId = element.getAttribute('data-topic-id');
           
-          if (draggedIndex !== -1 && targetIndex !== -1) {
-            const newTopics = [...topics];
-            const [draggedTopic] = newTopics.splice(draggedIndex, 1);
-            newTopics.splice(targetIndex, 0, draggedTopic);
+          if (hoveredId && hoveredId !== touchDragTopicId) {
+            const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
+            const targetIndex = topics.findIndex(t => t.id === hoveredId);
             
-            setTouchDragTopicId(draggedTopic.id);
-            updateTopics(newTopics);
+            if (draggedIndex !== -1 && targetIndex !== -1) {
+              const newTopics = [...topics];
+              const [draggedTopic] = newTopics.splice(draggedIndex, 1);
+              newTopics.splice(targetIndex, 0, draggedTopic);
+              
+              setTouchDragTopicId(draggedTopic.id);
+              updateTopics(newTopics);
+            }
           }
+          
+          setTouchDragOverTopicId(hoveredId);
+          break;
         }
-        
-        // Добавляем визуальный feedback
-        setTouchDragOverTopicId(hoveredId);
-        break;
       }
+      
+      // Если палец не над элементом, убираем feedback
+      if (!foundElement) {
+        setTouchDragOverTopicId(null);
+      }
+    } catch (error) {
+      console.error('Error in handleTopicTouchMove:', error);
     }
   };
 
@@ -2126,7 +2149,7 @@ export default function FrenchFlashCardsApp() {
                 }} className="text-black unified-section-header">
                   {topics.length} {topics.length === 1 ? 'topic' : 'topics'}
                 </h2>
-                <div className="flex flex-col" style={{ gap: '12px' }}>
+                <div className="flex flex-col topic-list-container" style={{ gap: '12px' }}>
                   {topics.map((topic, index) => {
                     return (
                     <div
@@ -2164,7 +2187,8 @@ export default function FrenchFlashCardsApp() {
                         opacity: (draggedTopicId === topic.id || touchDragTopicId === topic.id) ? 0.5 : 1,
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        touchAction: 'none',
+                        touchAction: 'manipulation',
+                        pointerEvents: 'auto',
                         transition: 'all 0.15s ease',
                       }}
                       className="p-4 flex items-center gap-4 cursor-pointer hover:bg-black/2"
