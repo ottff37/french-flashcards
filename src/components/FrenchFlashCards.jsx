@@ -3913,7 +3913,7 @@ export default function FrenchFlashCardsApp() {
               }} className="text-black unified-section-header">
                 {cards.length} {cards.length === 1 ? 'word' : 'words'}
               </h2>
-              <div className="flex flex-col cards-list-container" style={{ gap: '12px' }}>
+              <div className="flex flex-col cards-list-container w-full" style={{ gap: '8px' }}>
                 {cards.map((card, idx) => (
                   <div
                     key={idx}
@@ -3932,6 +3932,7 @@ export default function FrenchFlashCardsApp() {
                       draggedCardTo === idx && draggedCardFrom !== idx ? 'drop-target-card' : ''
                     }`}
                     style={{
+                      width: '100%',
                       border: '1.5px solid rgba(0, 0, 0, 0.08)',
                       boxSizing: 'border-box',
                       borderRadius: '20px',
