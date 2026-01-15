@@ -2003,7 +2003,6 @@ export default function FrenchFlashCardsApp() {
   if (!currentTopic) {
 
     return (
-      <>
       <div className="min-h-screen py-28 px-8" style={{ backgroundColor: '#F6F2F2' }}>
         <div className="max-w-2xl mx-auto flex flex-col items-center">
           {/* Заголовок */}
@@ -2263,7 +2262,7 @@ export default function FrenchFlashCardsApp() {
                         </svg>
                       </button>
                     </div>
-                    );
+                    )
                   })}
                 </div>
               </div>
@@ -2328,9 +2327,6 @@ export default function FrenchFlashCardsApp() {
               </div>
             </button>
           </div>
-
-        </div>
-      </div>
 
       {showApiKeyModal && (
         <div className="celebration-modal-overlay" style={{
@@ -2713,21 +2709,14 @@ export default function FrenchFlashCardsApp() {
                       fontSize: '16px',
                       fontWeight: '500',
                       fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                      lineHeight: '24px',
+                      letterSpacing: '0%',
                       color: '#000000',
                       backgroundColor: '#ffffff',
-                      outline: '0 !important',
-                      outlineWidth: '0 !important',
-                      outlineStyle: 'none !important',
-                      outlineOffset: '0 !important',
-                      boxShadow: 'none !important',
+                      colorScheme: 'light',
+                      outline: 'none',
                       boxSizing: 'border-box',
-                      WebkitFocusRingColor: 'transparent !important',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      appearance: 'none',
                     }}
-                    onFocus={(e) => e.target.style.borderColor = 'rgba(0, 0, 0, 0.3)'}
-                    onBlur={(e) => e.target.style.borderColor = 'rgba(0, 0, 0, 0.12)'}
                   />
 
                   {/* Char count */}
@@ -2823,7 +2812,8 @@ export default function FrenchFlashCardsApp() {
           </div>
         </div>
       )}
-      </>
+      </div>
+    </div>
     );
   }
 
@@ -2832,6 +2822,7 @@ export default function FrenchFlashCardsApp() {
   const currentCard = cards[currentCardIndex];
 
   return (
+    <>
     <div className="min-h-screen py-28 px-8" style={{ backgroundColor: '#F6F2F2' }}>
       <style>{`
         @keyframes spin {
@@ -3259,7 +3250,10 @@ export default function FrenchFlashCardsApp() {
                       style={{
                         flex: 1,
                         minWidth: 0,
+                        height: '56px',
+                        padding: '0 20px',
                         border: '1.5px solid rgba(0, 0, 0, 0.12)',
+                        borderRadius: '12px',
                         fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                         fontSize: '16px',
                         fontWeight: '500',
@@ -3267,14 +3261,9 @@ export default function FrenchFlashCardsApp() {
                         letterSpacing: '0%',
                         boxSizing: 'border-box',
                         color: '#000000',
+                        backgroundColor: '#ffffff',
                         colorScheme: 'light',
                         outline: 'none',
-                        backgroundColor: '#ffffff',
-                        height: '56px',
-                        padding: '0 20px',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
                       }}
                     />
                     {loadingTranslation && (
@@ -3833,5 +3822,6 @@ export default function FrenchFlashCardsApp() {
         )}
       </div>
     </div>
+    </>
   );
 }
