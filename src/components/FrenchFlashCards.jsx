@@ -370,6 +370,28 @@ if (typeof document !== 'undefined') {
           padding-left: 16px !important;
           padding-right: 16px !important;
         }
+        
+        /* Override card list font size on mobile */
+        .card-french-title {
+          font-size: 16px !important;
+          line-height: 28px !important;
+        }
+        
+        .topic-name {
+          font-size: 16px !important;
+          line-height: 28px !important;
+        }
+      }
+      
+      /* Desktop styles */
+      .card-french-title {
+        font-size: 16px !important;
+        line-height: 28px !important;
+      }
+      
+      .topic-name {
+        font-size: 16px !important;
+        line-height: 28px !important;
       }
       
       /* Desktop styles */
@@ -2258,10 +2280,11 @@ export default function FrenchFlashCardsApp() {
                         </p>
                         <p style={{
                           fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                          fontSize: '18px',
+                          fontSize: '16px',
                           fontWeight: '500',
                           lineHeight: '28px',
-                        }} className="text-black truncate">{topic.name}</p>
+                          color: '#000000',
+                        }} className="truncate topic-name">{topic.name}</p>
                       </div>
 
                       {/* Кнопка удаления */}
@@ -3799,10 +3822,11 @@ export default function FrenchFlashCardsApp() {
                       </p>
                       <p style={{
                         fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                        fontSize: '18px',
+                        fontSize: '16px',
                         fontWeight: '500',
                         lineHeight: '28px',
-                      }} className="text-black truncate">
+                        color: '#000000',
+                      }} className="truncate card-french-title">
                         {card.french.charAt(0).toUpperCase() + card.french.slice(1)}
                       </p>
                     </div>
