@@ -22,13 +22,15 @@ if (typeof document !== 'undefined') {
   const style = document.createElement('style');
   style.textContent = `
     html, body {
-      overscroll-behavior: none;
-      overscroll-behavior-y: none;
-      -webkit-overflow-scrolling: auto;
+      background-color: #F6F2F2;
+      -webkit-user-select: none;
+      user-select: none;
     }
     
     input, button, textarea, select {
       font-size: 16px !important;
+      -webkit-user-select: text;
+      user-select: text;
     }
     
     .sidebar-buttons-container {
@@ -44,6 +46,13 @@ if (typeof document !== 'undefined') {
       width: auto;
       height: auto;
       transition: all 0.3s ease;
+    }
+    
+    [draggable="true"],
+    .cursor-move,
+    .cursor-pointer {
+      -webkit-user-select: none;
+      user-select: none;
     }
     
     .back-button-sidebar, .export-button-sidebar, .import-button-sidebar {
@@ -885,6 +894,8 @@ export default function FrenchFlashCardsApp() {
   const [cardTextAlign, setCardTextAlign] = useState('center');
   const [shouldDuplicateTitle, setShouldDuplicateTitle] = useState(false);
   const [animationDuration, setAnimationDuration] = useState(20);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginUserId, setLoginUserId] = useState('');
   
   const inputRef = useRef(null);
   const topicTitleRef = useRef(null);
@@ -2051,6 +2062,8 @@ export default function FrenchFlashCardsApp() {
                         borderRadius: '24px',
                         backgroundColor: dragOverTopicId === topic.id && draggedTopicId !== topic.id ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
                         opacity: draggedTopicId === topic.id ? 0.5 : 1,
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
                       }}
                       className="p-4 flex items-center gap-4 cursor-pointer hover:bg-black/2"
                     >
@@ -2135,6 +2148,23 @@ export default function FrenchFlashCardsApp() {
               </div>
             </button>
 
+            {/* Login Button */}
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="export-button-sidebar"
+              style={{
+                border: 'none',
+                padding: 0,
+              }}
+              title="Login"
+            >
+              <div>
+                <svg width="22" height="22" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/>
+                </svg>
+              </div>
+            </button>
+
             {/* Export all topics button */}
             <button
               onClick={exportAllTopics}
@@ -2174,11 +2204,11 @@ export default function FrenchFlashCardsApp() {
             backgroundColor: '#ffffff',
             borderRadius: '24px',
             textAlign: 'center',
-            height: '642px',
             display: 'flex',
             flexDirection: 'column',
             padding: '32px',
             boxSizing: 'border-box',
+            minHeight: '600px',
           }}>
             {/* API Key Icon */}
             <div style={{ marginBottom: '32px', fontSize: '80px' }}>
@@ -2213,7 +2243,7 @@ export default function FrenchFlashCardsApp() {
 
             {/* API Key Input + Error Wrapper */}
             <div style={{
-              marginBottom: 'auto',
+              marginBottom: '32px',
               width: '100%',
             }}>
               {/* Input + Error Container */}
@@ -2350,6 +2380,8 @@ export default function FrenchFlashCardsApp() {
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
+              width: '100%',
+              marginTop: 'auto',
             }}>
               {/* Save Button */}
               <button
@@ -2427,6 +2459,213 @@ export default function FrenchFlashCardsApp() {
           </div>
         </div>
       )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '0 16px',
+          boxSizing: 'border-box',
+        }}>
+          <div className="celebration-modal-content" style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '32px',
+            boxSizing: 'border-box',
+            minHeight: '600px',
+          }}>
+            {/* Icon */}
+            <div style={{ marginBottom: '32px', fontSize: '80px' }}>
+              👤
+            </div>
+
+            {/* Title */}
+            <h1 style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '30px',
+              fontWeight: '500',
+              lineHeight: '38px',
+              letterSpacing: '0',
+              marginBottom: '12px',
+              color: '#000000',
+              textAlign: 'center',
+            }}>
+              Welcome
+            </h1>
+
+            {/* Subtitle */}
+            <p style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '16px',
+              fontWeight: '400',
+              lineHeight: '26px',
+              color: 'rgba(0, 0, 0, 0.6)',
+              marginBottom: '24px',
+            }}>
+              Sign in to your account
+            </p>
+
+            {/* Input with Icon */}
+            <div style={{
+              marginBottom: '32px',
+              width: '100%',
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+              }}>
+                {/* Icon */}
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginTop: '12px',
+                }}>
+                  <svg width="26" height="26" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/>
+                  </svg>
+                </div>
+
+                {/* Input Wrapper */}
+                <div style={{
+                  flex: 1,
+                  position: 'relative',
+                }}>
+                  <input
+                    type="text"
+                    value={loginUserId}
+                    onChange={(e) => setLoginUserId(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && loginUserId.trim()) {
+                        setShowLoginModal(false);
+                        setLoginUserId('');
+                      }
+                    }}
+                    placeholder="Enter your username"
+                    maxLength="50"
+                    style={{
+                      width: '100%',
+                      height: '56px',
+                      padding: '0 20px',
+                      border: '1.5px solid rgba(0, 0, 0, 0.12)',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                      color: '#000000',
+                      backgroundColor: '#ffffff',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'rgba(0, 0, 0, 0.3)'}
+                    onBlur={(e) => e.target.style.borderColor = 'rgba(0, 0, 0, 0.12)'}
+                  />
+
+                  {/* Char count */}
+                  <div style={{
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '12px',
+                    color: 'rgba(0, 0, 0, 0.4)',
+                  }}>
+                    {loginUserId.length}/50
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons Wrapper */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              width: '100%',
+              marginTop: 'auto',
+            }}>
+              {/* Sign In Button */}
+              <button
+                onClick={() => {
+                  if (loginUserId.trim()) {
+                    setShowLoginModal(false);
+                    setLoginUserId('');
+                    addSuccess(`Welcome, ${loginUserId}!`);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: loginUserId.trim() ? '#000000' : 'rgba(0, 0, 0, 0.05)',
+                  color: loginUserId.trim() ? '#ffffff' : 'rgba(0, 0, 0, 0.3)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  cursor: loginUserId.trim() ? 'pointer' : 'default',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (loginUserId.trim()) {
+                    e.target.style.backgroundColor = '#333333';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (loginUserId.trim()) {
+                    e.target.style.backgroundColor = '#000000';
+                  }
+                }}
+              >
+                Sign In
+              </button>
+
+              {/* Cancel Button */}
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setLoginUserId('');
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.07)',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </>
     );
   }
@@ -2485,6 +2724,10 @@ export default function FrenchFlashCardsApp() {
             backgroundColor: '#ffffff',
             borderRadius: '24px',
             textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '32px',
+            boxSizing: 'border-box',
           }}>
             {/* Flower Icon */}
             <div style={{ marginBottom: '32px', fontSize: '80px' }}>
@@ -2531,6 +2774,7 @@ export default function FrenchFlashCardsApp() {
                 lineHeight: '24px',
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
+                marginTop: 'auto',
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
               onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
@@ -3218,7 +3462,7 @@ export default function FrenchFlashCardsApp() {
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              style={{ cursor: isDragging ? 'grabbing' : 'grab', width: '614px', height: '560px' }}
+              style={{ cursor: isDragging ? 'grabbing' : 'grab', width: '614px', height: '560px', touchAction: 'none', userSelect: 'none' }}
             >
               {/* Контейнер слайдера */}
               <div
