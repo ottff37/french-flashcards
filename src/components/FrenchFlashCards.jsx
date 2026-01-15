@@ -756,52 +756,55 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
 
   const parseConjugation = () => {
     const result = [];
+    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
     
     // Объединяем все формы в одну строку
     let text = forms.join(' ').trim();
     
-    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-    
-    // Разбиваем по запятым
-    let parts = text.split(',').map(p => p.trim()).filter(p => p);
-    
-    // Парсим каждую часть
-    parts.forEach((part) => {
-      if (!part) return;
+    // Пытаемся разбить по запятым если они есть
+    if (text.includes(',')) {
+      const parts = text.split(',').map(p => p.trim()).filter(p => p);
       
-      // Пытаемся найти местоимение в начале этой части
-      let foundPronoun = null;
-      let foundVerbForm = null;
+      parts.forEach((part) => {
+        for (const pronoun of pronouns) {
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          if (regex.test(part)) {
+            const verbForm = part.replace(regex, '').trim();
+            if (verbForm) {
+              result.push({ pronoun: pronoun.toLowerCase(), verbForm });
+              return;
+            }
+          }
+        }
+      });
+    } else {
+      // Если нет запятых, ищем местоимения в тексте последовательно
+      let searchText = text;
       
-      // Проверяем каждое местоимение
       for (const pronoun of pronouns) {
-        // Ищем местоимение в начале строки (case-insensitive)
-        const regex = new RegExp(`^\s*${pronoun}\s+`, 'i');
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
+        const match = regex.exec(searchText);
         
-        if (regex.test(part)) {
-          foundPronoun = pronoun.toLowerCase();
-          // Удаляем местоимение и берём только форму глагола
-          foundVerbForm = part.replace(regex, '').trim();
-          break;
+        if (match) {
+          const startIdx = match.index + match[0].length;
+          
+          // Находим где заканчивается форма (до следующего местоимения или конца)
+          let endIdx = searchText.length;
+          for (const nextPronoun of pronouns) {
+            const nextRegex = new RegExp(`${nextPronoun}\\s+`, 'i');
+            const nextMatch = nextRegex.exec(searchText.substring(startIdx));
+            if (nextMatch) {
+              endIdx = Math.min(endIdx, startIdx + nextMatch.index);
+            }
+          }
+          
+          const verbForm = searchText.substring(startIdx, endIdx).trim();
+          if (verbForm) {
+            result.push({ pronoun: pronoun.toLowerCase(), verbForm });
+          }
         }
       }
-      
-      // Если нашли местоимение и форму - добавляем
-      if (foundPronoun && foundVerbForm) {
-        result.push({ 
-          pronoun: foundPronoun, 
-          verbForm: foundVerbForm
-        });
-      } else if (!foundPronoun && part.trim()) {
-        // Если местоимение не найдено и это первая форма - присваиваем "je"
-        if (result.length === 0) {
-          result.push({ 
-            pronoun: 'je', 
-            verbForm: part.trim()
-          });
-        }
-      }
-    });
+    }
     
     return result;
   };
@@ -940,52 +943,55 @@ const ConjugationTable = ({ conjugation, word }) => {
 
   const parseConjugation = () => {
     const result = [];
+    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
     
     // Объединяем все формы в одну строку
     let text = forms.join(' ').trim();
     
-    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-    
-    // Разбиваем по запятым
-    let parts = text.split(',').map(p => p.trim()).filter(p => p);
-    
-    // Парсим каждую часть
-    parts.forEach((part) => {
-      if (!part) return;
+    // Пытаемся разбить по запятым если они есть
+    if (text.includes(',')) {
+      const parts = text.split(',').map(p => p.trim()).filter(p => p);
       
-      // Пытаемся найти местоимение в начале этой части
-      let foundPronoun = null;
-      let foundVerbForm = null;
+      parts.forEach((part) => {
+        for (const pronoun of pronouns) {
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          if (regex.test(part)) {
+            const verbForm = part.replace(regex, '').trim();
+            if (verbForm) {
+              result.push({ pronoun: pronoun.toLowerCase(), verbForm });
+              return;
+            }
+          }
+        }
+      });
+    } else {
+      // Если нет запятых, ищем местоимения в тексте последовательно
+      let searchText = text;
       
-      // Проверяем каждое местоимение
       for (const pronoun of pronouns) {
-        // Ищем местоимение в начале строки (case-insensitive)
-        const regex = new RegExp(`^\s*${pronoun}\s+`, 'i');
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
+        const match = regex.exec(searchText);
         
-        if (regex.test(part)) {
-          foundPronoun = pronoun.toLowerCase();
-          // Удаляем местоимение и берём только форму глагола
-          foundVerbForm = part.replace(regex, '').trim();
-          break;
+        if (match) {
+          const startIdx = match.index + match[0].length;
+          
+          // Находим где заканчивается форма (до следующего местоимения или конца)
+          let endIdx = searchText.length;
+          for (const nextPronoun of pronouns) {
+            const nextRegex = new RegExp(`${nextPronoun}\\s+`, 'i');
+            const nextMatch = nextRegex.exec(searchText.substring(startIdx));
+            if (nextMatch) {
+              endIdx = Math.min(endIdx, startIdx + nextMatch.index);
+            }
+          }
+          
+          const verbForm = searchText.substring(startIdx, endIdx).trim();
+          if (verbForm) {
+            result.push({ pronoun: pronoun.toLowerCase(), verbForm });
+          }
         }
       }
-      
-      // Если нашли местоимение и форму - добавляем
-      if (foundPronoun && foundVerbForm) {
-        result.push({ 
-          pronoun: foundPronoun, 
-          verbForm: foundVerbForm
-        });
-      } else if (!foundPronoun && part.trim()) {
-        // Если местоимение не найдено и это первая форма - присваиваем "je"
-        if (result.length === 0) {
-          result.push({ 
-            pronoun: 'je', 
-            verbForm: part.trim()
-          });
-        }
-      }
-    });
+    }
     
     return result;
   };
@@ -1364,20 +1370,18 @@ export default function FrenchFlashCardsApp() {
         const prompt = `Для русского слова "${inputWord}":
 
 1. Переведи на французский язык (в начальную форму)
-   - Для ВОЗВРАТНЫХ глаголов обязательно вернуть с префиксом "se" или "s'" (например: se raser, s'endormir)
-   - Для обычных глаголов вернуть инфинитив (например: manger, avoir)
 2. Определи часть речи (глагол, существительное, прилагательное, наречие и т.д.)
 3. Если есть, укажи род (м. - мужской, ж. - женский, или -)
-4. Покажи все формы ЧЕТКО РАЗДЕЛЁННЫЕ ЗАПЯТЫМИ:
-   - Для глаголов: je форма1, tu форма2, il/elle форма3, nous форма4, vous форма5, ils/elles форма6
-   - ВАЖНО: Каждую пару "местоимение форма" разделять запятой!
+4. Покажи все формы ТОЛЬКО в компактном формате:
+   - Для глаголов: je/j', tu, il/elle, nous, vous, ils/elles
+   - Для существительных/прилагательных: единственное число, множественное число
 
 Ответь ТОЛЬКО в этом формате БЕЗ дополнительного текста:
 ФРАНЦУЗСКОЕ СЛОВО: [французское слово в начальной форме]
 ЧАСТЬ РЕЧИ: [глагол/существительное/прилагательное и т.д.]
 РОД: [м./ж./-]
 ФОРМЫ:
-je форма1, tu форма2, il/elle форма3, nous форма4, vous форма5, ils/elles форма6`;
+[компактный список форм без пояснений]`;
 
         const responseText = await callGeminiAPI(prompt);
 
@@ -1425,16 +1429,16 @@ je форма1, tu форма2, il/elle форма3, nous форма4, vous фо
 1. Дай краткий перевод на русский (одно-три слова)
 2. Определи часть речи (глагол, существительное, прилагательное, наречие и т.д.)
 3. Если есть, укажи род (м. - мужской, ж. - женский, или -)
-4. Покажи все формы ЧЕТКО РАЗДЕЛЁННЫЕ ЗАПЯТЫМИ:
-   - Для глаголов: je форма1, tu форма2, il/elle форма3, nous форма4, vous форма5, ils/elles форма6
-   - ВАЖНО: Каждую пару "местоимение форма" разделять запятой!
+4. Покажи все формы ТОЛЬКО в компактном формате:
+   - Для глаголов: je/j', tu, il/elle, nous, vous, ils/elles
+   - Для существительных/прилагательных: единственное число, множественное число
 
 Ответь ТОЛЬКО в этом формате БЕЗ дополнительного текста:
 ПЕРЕВОД: [перевод]
 ЧАСТЬ РЕЧИ: [глагол/существительное/прилагательное и т.д.]
 РОД: [м./ж./-]
 ФОРМЫ:
-je форма1, tu форма2, il/elle форма3, nous форма4, vous форма5, ils/elles форма6`;
+[компактный список форм без пояснений]`;
 
         const responseText = await callGeminiAPI(prompt);
 
