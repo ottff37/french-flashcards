@@ -891,8 +891,9 @@ export default function FrenchFlashCardsApp() {
   const [dragOverTopicId, setDragOverTopicId] = useState(null);
   const [draggedCardIndex, setDraggedCardIndex] = useState(null);
   const [dragOverCardIndex, setDragOverCardIndex] = useState(null);
-  const [topicTouchStart, setTopicTouchStart] = useState(null);
-  const [topicTouchOffset, setTopicTouchOffset] = useState(0);
+  const [touchDragTopicId, setTouchDragTopicId] = useState(null);
+  const [touchDragStartY, setTouchDragStartY] = useState(null);
+  const [touchDragOverTopicId, setTouchDragOverTopicId] = useState(null);
   const [editablePartOfSpeech, setEditablePartOfSpeech] = useState('');
   const [editableTypeOfWord, setEditableTypeOfWord] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -1656,51 +1657,44 @@ export default function FrenchFlashCardsApp() {
     setDragOverTopicId(null);
   };
 
-  // Touch handlers для перетаскивания тем на мобильных устройствах
+  // Touch-based drag and drop для тем на мобильных
   const handleTopicTouchStart = (e, topicId) => {
-    setDraggedTopicId(topicId);
-    setTopicTouchStart(e.touches[0].clientY);
-    setTopicTouchOffset(0);
+    setTouchDragTopicId(topicId);
+    setTouchDragStartY(e.touches[0].clientY);
   };
 
   const handleTopicTouchMove = (e, topicId) => {
-    if (!draggedTopicId || topicTouchStart === null) return;
+    if (!touchDragTopicId || touchDragStartY === null) return;
     
     const currentY = e.touches[0].clientY;
-    const offset = currentY - topicTouchStart;
-    setTopicTouchOffset(offset);
+    const diff = currentY - touchDragStartY;
     
-    // Определяем какой элемент находится под курсором
-    try {
-      const allTopicElements = Array.from(document.querySelectorAll('[data-topic-id]'));
+    // Если движение больше 5px, начинаем drag
+    if (Math.abs(diff) > 5) {
+      e.preventDefault();
       
-      // Находим элемент, который находится ближе всего к текущей позиции Y
+      // Находим элемент под пальцем
+      const allTopicElements = Array.from(document.querySelectorAll('.topic-item'));
       for (let element of allTopicElements) {
         const rect = element.getBoundingClientRect();
-        const elementId = element.getAttribute('data-topic-id');
-        
-        // Проверяем находится ли палец над этим элементом
         if (currentY >= rect.top && currentY <= rect.bottom) {
-          if (elementId && elementId !== draggedTopicId) {
-            setDragOverTopicId(elementId);
+          const hoveredId = element.getAttribute('data-topic-id');
+          if (hoveredId && hoveredId !== touchDragTopicId) {
+            setTouchDragOverTopicId(hoveredId);
           }
           break;
         }
       }
-    } catch (error) {
-      console.error('Error in handleTopicTouchMove:', error);
     }
   };
 
-  const handleTopicTouchEnd = (e, targetTopicId) => {
-    if (!draggedTopicId) return;
+  const handleTopicTouchEnd = (e) => {
+    if (!touchDragTopicId) return;
     
-    // Находим реальный целевой элемент по dragOverTopicId
-    const finalTargetId = dragOverTopicId || targetTopicId;
-    
-    if (draggedTopicId && draggedTopicId !== finalTargetId) {
-      const draggedIndex = topics.findIndex(t => t.id === draggedTopicId);
-      const targetIndex = topics.findIndex(t => t.id === finalTargetId);
+    // Выполняем перестановку если нужно
+    if (touchDragOverTopicId && touchDragOverTopicId !== touchDragTopicId) {
+      const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
+      const targetIndex = topics.findIndex(t => t.id === touchDragOverTopicId);
       
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newTopics = [...topics];
@@ -1711,10 +1705,9 @@ export default function FrenchFlashCardsApp() {
       }
     }
     
-    setDraggedTopicId(null);
-    setDragOverTopicId(null);
-    setTopicTouchStart(null);
-    setTopicTouchOffset(0);
+    setTouchDragTopicId(null);
+    setTouchDragStartY(null);
+    setTouchDragOverTopicId(null);
   };
 
   // Drag and drop для карточек слов
@@ -2147,6 +2140,7 @@ export default function FrenchFlashCardsApp() {
                     <div
                       key={topic.id}
                       data-topic-id={topic.id}
+                      className="topic-item"
                       draggable
                       onDragStart={(e) => {
                         handleTopicDragStart(e, topic.id);
@@ -2170,23 +2164,24 @@ export default function FrenchFlashCardsApp() {
                       onTouchMove={(e) => {
                         handleTopicTouchMove(e, topic.id);
                       }}
-                      onTouchEnd={(e) => {
-                        handleTopicTouchEnd(e, topic.id);
-                      }}
+                      onTouchEnd={handleTopicTouchEnd}
                       onClick={() => {
                         setCurrentTopic(topic);
                         setCurrentCardIndex(0);
                         setFlipped(false);
                       }}
                       style={{
-                        border: '1.5px solid rgba(0, 0, 0, 0.08)',
+                        border: (touchDragTopicId === topic.id || draggedTopicId === topic.id) 
+                          ? '2px dashed rgba(0, 0, 0, 0.3)' 
+                          : '1.5px solid rgba(0, 0, 0, 0.08)',
                         boxSizing: 'border-box',
                         borderRadius: '24px',
-                        backgroundColor: dragOverTopicId === topic.id && draggedTopicId !== topic.id ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
-                        opacity: draggedTopicId === topic.id ? 0.5 : 1,
+                        backgroundColor: (dragOverTopicId === topic.id || touchDragOverTopicId === topic.id) && (draggedTopicId !== topic.id && touchDragTopicId !== topic.id) ? 'rgba(0, 0, 0, 0.04)' : 'transparent',
+                        opacity: (draggedTopicId === topic.id || touchDragTopicId === topic.id) ? 0.6 : 1,
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        touchAction: 'none',
+                        touchAction: touchDragTopicId === topic.id ? 'none' : 'auto',
+                        transition: 'all 0.2s ease',
                       }}
                       className="p-4 flex items-center gap-4 cursor-pointer hover:bg-black/2"
                     >
