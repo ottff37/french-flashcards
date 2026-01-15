@@ -3687,7 +3687,7 @@ export default function FrenchFlashCardsApp() {
                             letterSpacing: `${cardLetterSpacing}px`,
                             textAlign: cardTextAlign,
                             color: '#000000'
-                          }}>{card.french}</p>
+                          }}>{card.french.charAt(0).toUpperCase() + card.french.slice(1)}</p>
                         </div>
                       </div>
 
@@ -3803,7 +3803,7 @@ export default function FrenchFlashCardsApp() {
                         fontWeight: '500',
                         lineHeight: '28px',
                       }} className="text-black truncate">
-                        {card.french}
+                        {card.french.charAt(0).toUpperCase() + card.french.slice(1)}
                       </p>
                     </div>
 
