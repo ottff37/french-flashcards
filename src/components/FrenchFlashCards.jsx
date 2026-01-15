@@ -693,66 +693,63 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
-    if (cleanBase.toLowerCase().startsWith('se ')) {
-      cleanBase = cleanBase.substring(3).trim();
-    } else if (cleanBase.toLowerCase().startsWith("s'")) {
-      cleanBase = cleanBase.substring(2).trim();
+
+    const original = verbForm.trim();
+    const base = (baseWord || '').trim();
+
+    // Reflexive/particle prefixes in conjugated forms (me, m', te, t', se, s', nous, vous)
+    // Examples: "me lave", "m'appelle", "Te laves", "nous lavons", "s'habille"
+    const prefixMatch = original.match(/^(me\s+|m'|te\s+|t'|se\s+|s'|nous\s+|vous\s+)/i);
+    const prefix = prefixMatch ? prefixMatch[0] : '';
+    const verbWithoutPrefix = original.slice(prefix.length).trim();
+
+    // Remove reflexive prefix from infinitive/base (se / s')
+    let baseWithoutPrefix = base;
+    if (/^se\s+/i.test(baseWithoutPrefix)) {
+      baseWithoutPrefix = baseWithoutPrefix.replace(/^se\s+/i, '').trim();
+    } else if (/^s'/i.test(baseWithoutPrefix)) {
+      baseWithoutPrefix = baseWithoutPrefix.replace(/^s'/i, '').trim();
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
-    let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
-    if (baseForMatching.endsWith('er')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('ir')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('re')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('oir')) {
-      baseForMatching = baseForMatching.slice(0, -3);
-    }
-    
-    // Находим где кончается корень
+
+    const stripInfinitiveEnding = (w) => {
+      const lower = w.toLowerCase();
+      if (lower.endsWith('er')) return w.slice(0, -2);
+      if (lower.endsWith('ir')) return w.slice(0, -2);
+      if (lower.endsWith('re')) return w.slice(0, -2);
+      if (lower.endsWith('oir')) return w.slice(0, -3);
+      return w;
+    };
+
+    const baseRoot = stripInfinitiveEnding(baseWithoutPrefix).toLowerCase();
+    const compare = verbWithoutPrefix;
+    const compareLower = compare.toLowerCase();
+
+    // Find common prefix length (root)
     let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
+    const minLength = Math.min(baseRoot.length, compareLower.length);
+
     for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
+      if (baseRoot[i] === compareLower[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
-    if (commonLength < 3) {
-      return cleanVerb;
+
+    // Too little match -> don't highlight (avoid false positives)
+    if (commonLength < 2) {
+      return original;
     }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
+
+    // If there's no ending, return as-is
+    if (commonLength >= compare.length) {
+      return `${prefix}${compare}`;
     }
-    
-    return cleanVerb;
+
+    const root = compare.substring(0, commonLength);
+    const ending = compare.substring(commonLength);
+
+    return `${prefix}${root}<b>${ending}</b>`;
   };
 
   const parseConjugation = () => {
@@ -773,9 +770,7 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
       
       parts.forEach((part) => {
         for (const pronoun of pronouns) {
-          const regex = pronoun === 'je'
-            ? /^\s*(?:je\s*(?:\/\s*j')?\s+|j')/i
-            : new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
           if (regex.test(part)) {
             const verbForm = part.replace(regex, '').trim();
             result[pronoun.toLowerCase()] = verbForm;
@@ -790,9 +785,7 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
       // Сначала ищем все позиции местоимений
       const pronounPositions = [];
       for (const pronoun of pronouns) {
-        const regex = pronoun === 'je'
-          ? /(je\s*(?:\/\s*j')?\s+|j')/i
-          : new RegExp(`${pronoun}\\s+`, 'i');
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
         const match = regex.exec(searchText);
         
         if (match) {
@@ -908,66 +901,63 @@ const ConjugationTable = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
-    if (cleanBase.toLowerCase().startsWith('se ')) {
-      cleanBase = cleanBase.substring(3).trim();
-    } else if (cleanBase.toLowerCase().startsWith("s'")) {
-      cleanBase = cleanBase.substring(2).trim();
+
+    const original = verbForm.trim();
+    const base = (baseWord || '').trim();
+
+    // Reflexive/particle prefixes in conjugated forms (me, m', te, t', se, s', nous, vous)
+    // Examples: "me lave", "m'appelle", "Te laves", "nous lavons", "s'habille"
+    const prefixMatch = original.match(/^(me\s+|m'|te\s+|t'|se\s+|s'|nous\s+|vous\s+)/i);
+    const prefix = prefixMatch ? prefixMatch[0] : '';
+    const verbWithoutPrefix = original.slice(prefix.length).trim();
+
+    // Remove reflexive prefix from infinitive/base (se / s')
+    let baseWithoutPrefix = base;
+    if (/^se\s+/i.test(baseWithoutPrefix)) {
+      baseWithoutPrefix = baseWithoutPrefix.replace(/^se\s+/i, '').trim();
+    } else if (/^s'/i.test(baseWithoutPrefix)) {
+      baseWithoutPrefix = baseWithoutPrefix.replace(/^s'/i, '').trim();
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
-    let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
-    if (baseForMatching.endsWith('er')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('ir')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('re')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('oir')) {
-      baseForMatching = baseForMatching.slice(0, -3);
-    }
-    
-    // Находим где кончается корень
+
+    const stripInfinitiveEnding = (w) => {
+      const lower = w.toLowerCase();
+      if (lower.endsWith('er')) return w.slice(0, -2);
+      if (lower.endsWith('ir')) return w.slice(0, -2);
+      if (lower.endsWith('re')) return w.slice(0, -2);
+      if (lower.endsWith('oir')) return w.slice(0, -3);
+      return w;
+    };
+
+    const baseRoot = stripInfinitiveEnding(baseWithoutPrefix).toLowerCase();
+    const compare = verbWithoutPrefix;
+    const compareLower = compare.toLowerCase();
+
+    // Find common prefix length (root)
     let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
+    const minLength = Math.min(baseRoot.length, compareLower.length);
+
     for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
+      if (baseRoot[i] === compareLower[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
-    if (commonLength < 3) {
-      return cleanVerb;
+
+    // Too little match -> don't highlight (avoid false positives)
+    if (commonLength < 2) {
+      return original;
     }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
+
+    // If there's no ending, return as-is
+    if (commonLength >= compare.length) {
+      return `${prefix}${compare}`;
     }
-    
-    return cleanVerb;
+
+    const root = compare.substring(0, commonLength);
+    const ending = compare.substring(commonLength);
+
+    return `${prefix}${root}<b>${ending}</b>`;
   };
 
   const parseConjugation = () => {
@@ -988,9 +978,7 @@ const ConjugationTable = ({ conjugation, word }) => {
       
       parts.forEach((part) => {
         for (const pronoun of pronouns) {
-          const regex = pronoun === 'je'
-            ? /^\s*(?:je\s*(?:\/\s*j')?\s+|j')/i
-            : new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
           if (regex.test(part)) {
             const verbForm = part.replace(regex, '').trim();
             result[pronoun.toLowerCase()] = verbForm;
@@ -1005,9 +993,7 @@ const ConjugationTable = ({ conjugation, word }) => {
       // Сначала ищем все позиции местоимений
       const pronounPositions = [];
       for (const pronoun of pronouns) {
-        const regex = pronoun === 'je'
-          ? /(je\s*(?:\/\s*j')?\s+|j')/i
-          : new RegExp(`${pronoun}\\s+`, 'i');
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
         const match = regex.exec(searchText);
         
         if (match) {
@@ -2007,23 +1993,20 @@ export default function FrenchFlashCardsApp() {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!currentTopic) {
-      setDraggedCardIndex(null);
-      setDragOverCardIndex(null);
-      return;
-    }
-
     if (draggedCardIndex !== null && draggedCardIndex !== targetCardIndex) {
-      const newCards = [...(currentTopic.cards || [])];
+      const newCards = [...cards];
       const [draggedCard] = newCards.splice(draggedCardIndex, 1);
       newCards.splice(targetCardIndex, 0, draggedCard);
-
-      // Update cards in current topic + persist to storage
-      const updatedTopics = topics.map(t =>
-        t.id === currentTopic.id ? { ...t, cards: newCards } : t
-      );
-      updateTopics(updatedTopics);
-      setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
+      
+      setCards(newCards);
+      
+      // Update cards in current topic
+      if (currentTopic) {
+        const updatedTopics = topics.map(t => 
+          t.id === currentTopic.id ? { ...t, cards: newCards } : t
+        );
+        updateTopics(updatedTopics);
+      }
     }
     
     setDraggedCardIndex(null);
@@ -2177,36 +2160,34 @@ export default function FrenchFlashCardsApp() {
         const imported = JSON.parse(e.target.result);
         
         if (imported.words && Array.isArray(imported.words)) {
-          const updatedTopics = topics.map(topic => {
+          const updated = topics.map(topic => {
             if (topic.id === currentTopic.id) {
               return {
                 ...topic,
-                cards: [...(topic.cards || []), ...imported.words]
+                cards: [...topic.cards, ...imported.words]
               };
             }
             return topic;
           });
 
-          updateTopics(updatedTopics);
-          const updatedTopic = updatedTopics.find(t => t.id === currentTopic.id);
-          if (updatedTopic) setCurrentTopic(updatedTopic);
-
-          addSuccess(`Imported ${imported.words.length} word${imported.words.length !== 1 ? 's' : ''} to "${currentTopic.name}"!`);
+          setTopics(updated);
+          saveTopics(updated);
+          
+          const updatedTopic = updated.find(t => t.id === currentTopic.id);
+          setCurrentTopic(updatedTopic);
+          
+          alert(`✅ Успешно импортировано ${imported.words.length} слов в тему "${currentTopic.name}"!`);
         } else {
-          addError('Invalid file format. Please use a file exported from the app.');
+          alert('❌ Неверный формат файла. Пожалуйста, используйте файл, экспортированный из приложения.');
         }
       } catch (error) {
-        addError(`Error reading file: ${error.message}`);
+        alert(`❌ Ошибка при чтении файла: ${error.message}`);
       }
     };
     reader.readAsText(file);
 
     // Очищаем input
-    try {
-      event.target.value = '';
-    } catch (e) {
-      // ignore
-    }
+    event.target.value = '';
   };
 
   // Drag handlers for import - available everywhere
@@ -2678,7 +2659,7 @@ export default function FrenchFlashCardsApp() {
                           }
                         }
                       }}
-                      placeholder="Starts with AIza"
+                      placeholder="Starts with Alza"
                       style={{
                         width: '100%',
                         height: '56px',
@@ -4218,7 +4199,7 @@ export default function FrenchFlashCardsApp() {
                           }
                         }
                       }}
-                      placeholder="Starts with AIza"
+                      placeholder="Starts with Alza"
                       style={{
                         width: '100%',
                         height: '56px',
