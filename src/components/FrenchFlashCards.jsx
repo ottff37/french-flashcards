@@ -1799,73 +1799,53 @@ export default function FrenchFlashCardsApp() {
     }
   };
 
-  // ========== CARD POINTER HANDLERS (для touch drag на мобилке) ==========
+  // ========== CARD DRAG AND DROP HANDLERS ==========
   
-  const handleCardPointerDown = (e, cardIndex) => {
-    // Только для сенсорного ввода (touch)
-    if (e.pointerType === 'touch') {
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setDraggedCardIndex(cardIndex);
-      console.log('Pointer down on card:', cardIndex);
-    }
+  const onCardDragStart = (e, cardIndex) => {
+    setDraggedCardIndex(cardIndex);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(cardIndex));
+    console.log('Drag start card:', cardIndex);
   };
 
-  const handleCardPointerMove = (e, cardIndex) => {
-    if (draggedCardIndex === null || draggedCardIndex === undefined || e.pointerType !== 'touch') {
-      return;
-    }
-    
+  const onCardDragOver = (e, cardIndex) => {
     e.preventDefault();
-    
-    try {
-      const currentY = e.clientY;
-      
-      const cardsList = document.querySelector('.cards-list-container');
-      if (!cardsList) return;
-      
-      const allCardElements = Array.from(cardsList.querySelectorAll('.card-item'));
-      let foundElement = false;
-      
-      for (let element of allCardElements) {
-        const rect = element.getBoundingClientRect();
-        if (currentY >= rect.top && currentY <= rect.bottom) {
-          foundElement = true;
-          const hoveredIndex = parseInt(element.getAttribute('data-card-index'), 10);
-          
-          if (hoveredIndex !== draggedCardIndex && draggedCardIndex !== null) {
-            const newCards = [...cards];
-            const [draggedCard] = newCards.splice(draggedCardIndex, 1);
-            newCards.splice(hoveredIndex, 0, draggedCard);
-            
-            setDraggedCardIndex(hoveredIndex);
-            const updatedTopic = {
-              ...currentTopic,
-              cards: newCards
-            };
-            updateCurrentTopic([updatedTopic]);
-          }
-          
-          setDragOverCardIndex(hoveredIndex);
-          break;
-        }
-      }
-      
-      if (!foundElement) {
-        setDragOverCardIndex(null);
-      }
-    } catch (error) {
-      console.error('Error in handleCardPointerMove:', error);
+    if (cardIndex !== draggedCardIndex) {
+      setDragOverCardIndex(cardIndex);
     }
   };
 
-  const handleCardPointerUp = (e) => {
-    if (e.pointerType === 'touch') {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-      console.log('Pointer up - clearing card drag state');
+  const onCardDragLeave = () => {
+    setDragOverCardIndex(null);
+  };
+
+  const onCardDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (draggedCardIndex === null || draggedCardIndex === dragOverCardIndex) {
       setDraggedCardIndex(null);
       setDragOverCardIndex(null);
+      return;
     }
+
+    const updatedCards = [...cards];
+    const draggedCard = updatedCards.splice(draggedCardIndex, 1)[0];
+    updatedCards.splice(dragOverCardIndex, 0, draggedCard);
+
+    const updatedTopic = {
+      ...currentTopic,
+      cards: updatedCards
+    };
+    updateCurrentTopic([updatedTopic]);
+
+    setDraggedCardIndex(null);
+    setDragOverCardIndex(null);
+  };
+
+  const onCardDragEnd = () => {
+    setDraggedCardIndex(null);
+    setDragOverCardIndex(null);
   };
 
   // Drag and drop для карточек слов
@@ -2969,6 +2949,16 @@ export default function FrenchFlashCardsApp() {
           touch-action: none;
           user-select: none;
         }
+        .dragging-card {
+          opacity: 0.6;
+          background-color: #e8f4f8;
+          border: 1.5px dashed rgba(0, 0, 0, 0.3) !important;
+        }
+        .drop-target-card {
+          background-color: #f0f0f0;
+          border: 1.5px dashed rgba(0, 0, 0, 0.5) !important;
+          opacity: 0.7;
+        }
         /* iOS Safe Area */
         @supports (padding: max(0px)) {
           body {
@@ -3912,17 +3902,24 @@ export default function FrenchFlashCardsApp() {
                   <div
                     key={idx}
                     data-card-index={idx}
-                    className="card-item flex items-center gap-4 cursor-pointer hover:bg-black/2 transition"
-                    onPointerDown={(e) => handleCardPointerDown(e, idx)}
-                    onPointerMove={(e) => handleCardPointerMove(e, idx)}
-                    onPointerUp={handleCardPointerUp}
+                    draggable
+                    onDragStart={(e) => onCardDragStart(e, idx)}
+                    onDragOver={(e) => onCardDragOver(e, idx)}
+                    onDragLeave={onCardDragLeave}
+                    onDrop={onCardDrop}
+                    onDragEnd={onCardDragEnd}
+                    className={`card-item flex items-center gap-4 transition ${
+                      draggedCardIndex === idx ? 'dragging-card' : ''
+                    } ${
+                      dragOverCardIndex === idx && draggedCardIndex !== idx ? 'drop-target-card' : ''
+                    }`}
                     style={{
                       border: '1.5px solid rgba(0, 0, 0, 0.08)',
                       boxSizing: 'border-box',
                       borderRadius: '20px',
                       overflow: 'visible',
                       padding: '0.9rem',
-                      touchAction: 'none',
+                      cursor: draggedCardIndex === idx ? 'grabbing' : 'grab',
                       userSelect: 'none',
                     }}
                   >
