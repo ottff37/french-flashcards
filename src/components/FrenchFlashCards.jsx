@@ -1069,6 +1069,17 @@ export default function FrenchFlashCardsApp() {
     }
 
     const data = await response.json();
+    
+    // Проверяем что ответ содержит ожидаемые данные
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.error('Unexpected API response structure:', JSON.stringify(data, null, 2));
+      // Проверяем есть ли сообщение об ошибке от API
+      if (data.error) {
+        throw new Error(`API Error: ${data.error.message}`);
+      }
+      throw new Error('Could not parse translation from response');
+    }
+    
     return data.candidates[0].content.parts[0].text;
   };
 
@@ -1184,10 +1195,10 @@ export default function FrenchFlashCardsApp() {
       return;
     }
 
-    // Проверяем что в слове только буквы, апострофы и дефисы
-    const validWordPattern = /^[а-яёА-ЯЁa-zA-Z\-']+$/;
+    // Проверяем что в слове только буквы, апострофы, дефисы и пробелы
+    const validWordPattern = /^[а-яёА-ЯЁa-zA-Z\-' ]+$/;
     if (!validWordPattern.test(inputWord.trim())) {
-      addError('Only letters, hyphens, and apostrophes are allowed');
+      addError('Only letters, hyphens, spaces, and apostrophes are allowed');
       clearTranslation();
       return;
     }
@@ -1289,9 +1300,17 @@ export default function FrenchFlashCardsApp() {
       }
     } catch (error) {
       console.error('Ошибка при переводе:', error);
+      console.error('Full error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      
       const errorMessage = error.message.includes('quota') || error.message.includes('rate') 
         ? 'Rate limit exceeded. Please try again later.'
-        : `Error: ${error.message}`;
+        : error.message.includes('API Error') || error.message.includes('Could not parse')
+        ? error.message
+        : `Error: ${error.message}`
+      
       addError(errorMessage);
       clearTranslation();
     } finally {
