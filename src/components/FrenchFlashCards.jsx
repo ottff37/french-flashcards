@@ -685,9 +685,29 @@ const InfoTable = ({ partOfSpeech, gender }) => {
 
 // Компонент для таблицы на белом фоне (обратная сторона карточки)
 const ConjugationTableWhite = ({ conjugation, word }) => {
+  const [editableForms, setEditableForms] = React.useState({});
+  
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
+
+  // Обработчик Ctrl+B для выделения жирным
+  const handleKeyDown = (e, pronoun) => {
+    if (e.ctrlKey && e.key === 'b') {
+      e.preventDefault();
+      const selection = window.getSelection();
+      if (selection.toString()) {
+        document.execCommand('bold', false, null);
+      }
+    }
+  };
+
+  const handleChange = (e, pronoun) => {
+    setEditableForms(prev => ({
+      ...prev,
+      [pronoun]: e.currentTarget.innerHTML
+    }));
+  };
 
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
@@ -755,8 +775,13 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   };
 
   const parseConjugation = () => {
-    const result = [];
     const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
+    const result = {};
+    
+    // Инициализируем пустые значения для всех местоимений
+    pronouns.forEach(p => {
+      result[p] = '';
+    });
     
     // Объединяем все формы в одну строку
     let text = forms.join(' ').trim();
@@ -770,10 +795,8 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
           const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
           if (regex.test(part)) {
             const verbForm = part.replace(regex, '').trim();
-            if (verbForm) {
-              result.push({ pronoun: pronoun.toLowerCase(), verbForm });
-              return;
-            }
+            result[pronoun.toLowerCase()] = verbForm;
+            return;
           }
         }
       });
@@ -781,32 +804,53 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
       // Если нет запятых, ищем местоимения в тексте последовательно
       let searchText = text;
       
+      // Сначала ищем все позиции местоимений
+      const pronounPositions = [];
       for (const pronoun of pronouns) {
         const regex = new RegExp(`${pronoun}\\s+`, 'i');
         const match = regex.exec(searchText);
         
         if (match) {
-          const startIdx = match.index + match[0].length;
+          pronounPositions.push({
+            pronoun: pronoun.toLowerCase(),
+            index: match.index,
+            endIndex: match.index + match[0].length
+          });
+        }
+      }
+      
+      // Если нет местоимений вообще, добавляем всё как "je"
+      if (pronounPositions.length === 0) {
+        result['je'] = searchText;
+      } else {
+        // Сортируем по позиции
+        pronounPositions.sort((a, b) => a.index - b.index);
+        
+        // Если первый найденный текст не начинается с местоимения, добавляем "je"
+        if (pronounPositions[0].index > 0) {
+          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
+          result['je'] = jeForm;
+        }
+        
+        // Извлекаем формы между местоимениями
+        for (let i = 0; i < pronounPositions.length; i++) {
+          const current = pronounPositions[i];
+          const next = pronounPositions[i + 1];
           
-          // Находим где заканчивается форма (до следующего местоимения или конца)
-          let endIdx = searchText.length;
-          for (const nextPronoun of pronouns) {
-            const nextRegex = new RegExp(`${nextPronoun}\\s+`, 'i');
-            const nextMatch = nextRegex.exec(searchText.substring(startIdx));
-            if (nextMatch) {
-              endIdx = Math.min(endIdx, startIdx + nextMatch.index);
-            }
-          }
-          
+          const startIdx = current.endIndex;
+          const endIdx = next ? next.index : searchText.length;
           const verbForm = searchText.substring(startIdx, endIdx).trim();
-          if (verbForm) {
-            result.push({ pronoun: pronoun.toLowerCase(), verbForm });
-          }
+          
+          result[current.pronoun] = verbForm;
         }
       }
     }
     
-    return result;
+    // Преобразуем объект в массив в правильном порядке
+    return pronouns.map(p => ({
+      pronoun: p,
+      verbForm: result[p] || ''
+    }));
   };
 
   const parsedForms = parseConjugation();
@@ -849,8 +893,11 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
                 {form.pronoun}
               </td>
               <td 
-                className="text-left"
-                dangerouslySetInnerHTML={{ __html: highlighted }}
+                contentEditable
+                suppressContentEditableWarning
+                className="text-left cursor-text"
+                onKeyDown={(e) => handleKeyDown(e, form.pronoun)}
+                onInput={(e) => handleChange(e, form.pronoun)}
                 style={{
                   borderTopRightRadius: isFirst ? '16px' : '0',
                   borderBottomRightRadius: isLast ? '16px' : '0',
@@ -859,9 +906,13 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
                   borderBottom: '2px solid rgba(0, 0, 0, 0.08)',
                   padding: '12px 16px',
                   flex: 1,
-                  textTransform: 'capitalize'
+                  textTransform: 'capitalize',
+                  outline: 'none',
+                  minHeight: '20px'
                 }}
-              />
+              >
+                {editableForms[form.pronoun] !== undefined ? editableForms[form.pronoun] : highlighted}
+              </td>
             </tr>
           );
         })}
@@ -872,9 +923,29 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
 
 // Компонент для отображения спряжения в таблице
 const ConjugationTable = ({ conjugation, word }) => {
+  const [editableForms, setEditableForms] = React.useState({});
+  
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
+
+  // Обработчик Ctrl+B для выделения жирным
+  const handleKeyDown = (e, pronoun) => {
+    if (e.ctrlKey && e.key === 'b') {
+      e.preventDefault();
+      const selection = window.getSelection();
+      if (selection.toString()) {
+        document.execCommand('bold', false, null);
+      }
+    }
+  };
+
+  const handleChange = (e, pronoun) => {
+    setEditableForms(prev => ({
+      ...prev,
+      [pronoun]: e.currentTarget.innerHTML
+    }));
+  };
 
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
@@ -942,8 +1013,13 @@ const ConjugationTable = ({ conjugation, word }) => {
   };
 
   const parseConjugation = () => {
-    const result = [];
     const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
+    const result = {};
+    
+    // Инициализируем пустые значения для всех местоимений
+    pronouns.forEach(p => {
+      result[p] = '';
+    });
     
     // Объединяем все формы в одну строку
     let text = forms.join(' ').trim();
@@ -957,10 +1033,8 @@ const ConjugationTable = ({ conjugation, word }) => {
           const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
           if (regex.test(part)) {
             const verbForm = part.replace(regex, '').trim();
-            if (verbForm) {
-              result.push({ pronoun: pronoun.toLowerCase(), verbForm });
-              return;
-            }
+            result[pronoun.toLowerCase()] = verbForm;
+            return;
           }
         }
       });
@@ -968,32 +1042,53 @@ const ConjugationTable = ({ conjugation, word }) => {
       // Если нет запятых, ищем местоимения в тексте последовательно
       let searchText = text;
       
+      // Сначала ищем все позиции местоимений
+      const pronounPositions = [];
       for (const pronoun of pronouns) {
         const regex = new RegExp(`${pronoun}\\s+`, 'i');
         const match = regex.exec(searchText);
         
         if (match) {
-          const startIdx = match.index + match[0].length;
+          pronounPositions.push({
+            pronoun: pronoun.toLowerCase(),
+            index: match.index,
+            endIndex: match.index + match[0].length
+          });
+        }
+      }
+      
+      // Если нет местоимений вообще, добавляем всё как "je"
+      if (pronounPositions.length === 0) {
+        result['je'] = searchText;
+      } else {
+        // Сортируем по позиции
+        pronounPositions.sort((a, b) => a.index - b.index);
+        
+        // Если первый найденный текст не начинается с местоимения, добавляем "je"
+        if (pronounPositions[0].index > 0) {
+          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
+          result['je'] = jeForm;
+        }
+        
+        // Извлекаем формы между местоимениями
+        for (let i = 0; i < pronounPositions.length; i++) {
+          const current = pronounPositions[i];
+          const next = pronounPositions[i + 1];
           
-          // Находим где заканчивается форма (до следующего местоимения или конца)
-          let endIdx = searchText.length;
-          for (const nextPronoun of pronouns) {
-            const nextRegex = new RegExp(`${nextPronoun}\\s+`, 'i');
-            const nextMatch = nextRegex.exec(searchText.substring(startIdx));
-            if (nextMatch) {
-              endIdx = Math.min(endIdx, startIdx + nextMatch.index);
-            }
-          }
-          
+          const startIdx = current.endIndex;
+          const endIdx = next ? next.index : searchText.length;
           const verbForm = searchText.substring(startIdx, endIdx).trim();
-          if (verbForm) {
-            result.push({ pronoun: pronoun.toLowerCase(), verbForm });
-          }
+          
+          result[current.pronoun] = verbForm;
         }
       }
     }
     
-    return result;
+    // Преобразуем объект в массив в правильном порядке
+    return pronouns.map(p => ({
+      pronoun: p,
+      verbForm: result[p] || ''
+    }));
   };
 
   const parsedForms = parseConjugation();
@@ -1014,9 +1109,15 @@ const ConjugationTable = ({ conjugation, word }) => {
                 {form.pronoun}
               </td>
               <td 
-                className="py-4 px-4 text-left" 
-                dangerouslySetInnerHTML={{ __html: highlighted }}
-              />
+                contentEditable
+                suppressContentEditableWarning
+                className="py-4 px-4 text-left cursor-text"
+                onKeyDown={(e) => handleKeyDown(e, form.pronoun)}
+                onInput={(e) => handleChange(e, form.pronoun)}
+                style={{ outline: 'none', minHeight: '20px' }}
+              >
+                {editableForms[form.pronoun] !== undefined ? editableForms[form.pronoun] : highlighted}
+              </td>
             </tr>
           );
         })}
