@@ -2355,24 +2355,7 @@ export default function FrenchFlashCardsApp() {
               </div>
             </button>
 
-            {/* Export all topics button */}
-            <button
-              onClick={exportAllTopics}
-              disabled={topics.length === 0}
-              className="export-button-sidebar"
-              style={{
-                border: 'none',
-                padding: 0,
-              }}
-              title="Export all topics"
-            >
-              <div>
-                <svg width="20" height="20" viewBox="0 -960 960 960" fill="#000000">
-                  <path d="M480-480ZM202-65l-56-57 118-118h-90v-80h226v226h-80v-89L202-65Zm278-15v-80h240v-440H520v-200H240v400h-80v-400q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H480Z"/>
-                </svg>
-              </div>
-            </button>
-          </div>
+            </div>
 
       {showApiKeyModal && (
         <div className="celebration-modal-overlay" style={{
