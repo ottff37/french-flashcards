@@ -1847,10 +1847,10 @@ export default function FrenchFlashCardsApp() {
       e.preventDefault();
       if (distance > 0) {
         // Свайп вправо → предыдущая карточка
-        setCurrentCardIndex((prev) => (prev - 1 + cards.length) % cards.length);
+        setCurrentCardIndex((prev) => (prev - 1 + currentTopic.cards.length) % currentTopic.cards.length);
       } else {
         // Свайп влево → следующая карточка
-        setCurrentCardIndex((prev) => (prev + 1) % cards.length);
+        setCurrentCardIndex((prev) => (prev + 1) % currentTopic.cards.length);
       }
       setFlipped(false);
     }
@@ -1895,10 +1895,10 @@ export default function FrenchFlashCardsApp() {
       setCanFlip(false);
       if (distance > 0) {
         // Свайп вправо → предыдущая карточка
-        setCurrentCardIndex((prev) => (prev - 1 + cards.length) % cards.length);
+        setCurrentCardIndex((prev) => (prev - 1 + currentTopic.cards.length) % currentTopic.cards.length);
       } else {
         // Свайп влево → следующая карточка
-        setCurrentCardIndex((prev) => (prev + 1) % cards.length);
+        setCurrentCardIndex((prev) => (prev + 1) % currentTopic.cards.length);
       }
       setFlipped(false);
     }
