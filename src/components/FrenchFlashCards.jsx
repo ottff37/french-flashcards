@@ -686,6 +686,7 @@ const InfoTable = ({ partOfSpeech, gender }) => {
 // Компонент для таблицы на белом фоне (обратная сторона карточки)
 const ConjugationTableWhite = ({ conjugation, word }) => {
   const [editableForms, setEditableForms] = React.useState({});
+  const cellRefs = React.useRef({});
   
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
@@ -703,10 +704,13 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   };
 
   const handleChange = (e, pronoun) => {
-    setEditableForms(prev => ({
-      ...prev,
-      [pronoun]: e.currentTarget.innerHTML
-    }));
+    if (e && e.currentTarget) {
+      const html = e.currentTarget.innerHTML;
+      setEditableForms(prev => ({
+        ...prev,
+        [pronoun]: html
+      }));
+    }
   };
 
   // Функция для выделения окончания
@@ -897,10 +901,12 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
                 suppressContentEditableWarning
                 className="text-left cursor-text"
                 onKeyDown={(e) => handleKeyDown(e, form.pronoun)}
-                onBlur={(e) => handleChange(e, form.pronoun)}
                 onInput={(e) => handleChange(e, form.pronoun)}
-                dangerouslySetInnerHTML={{
-                  __html: editableForms[form.pronoun] !== undefined ? editableForms[form.pronoun] : highlighted
+                ref={(el) => {
+                  cellRefs.current[form.pronoun] = el;
+                  if (el && !editableForms[form.pronoun] && form.verbForm) {
+                    el.innerHTML = highlighted;
+                  }
                 }}
                 style={{
                   borderTopRightRadius: isFirst ? '16px' : '0',
@@ -913,7 +919,7 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
                   textTransform: 'capitalize',
                   outline: 'none',
                   minHeight: '20px',
-                  backgroundColor: editableForms[form.pronoun] !== undefined ? 'rgba(200, 220, 255, 0.3)' : 'transparent'
+                  backgroundColor: editableForms[form.pronoun] ? 'rgba(200, 220, 255, 0.3)' : 'transparent'
                 }}
               />
             </tr>
@@ -927,6 +933,7 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
 // Компонент для отображения спряжения в таблице
 const ConjugationTable = ({ conjugation, word }) => {
   const [editableForms, setEditableForms] = React.useState({});
+  const cellRefs = React.useRef({});
   
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
@@ -944,10 +951,12 @@ const ConjugationTable = ({ conjugation, word }) => {
   };
 
   const handleChange = (e, pronoun) => {
-    setEditableForms(prev => ({
-      ...prev,
-      [pronoun]: e.currentTarget.innerHTML
-    }));
+    if (e && e.currentTarget) {
+      setEditableForms(prev => ({
+        ...prev,
+        [pronoun]: e.currentTarget.innerHTML
+      }));
+    }
   };
 
   // Функция для выделения окончания
@@ -1116,15 +1125,17 @@ const ConjugationTable = ({ conjugation, word }) => {
                 suppressContentEditableWarning
                 className="py-4 px-4 text-left cursor-text"
                 onKeyDown={(e) => handleKeyDown(e, form.pronoun)}
-                onBlur={(e) => handleChange(e, form.pronoun)}
                 onInput={(e) => handleChange(e, form.pronoun)}
-                dangerouslySetInnerHTML={{
-                  __html: editableForms[form.pronoun] !== undefined ? editableForms[form.pronoun] : highlighted
+                ref={(el) => {
+                  cellRefs.current[form.pronoun] = el;
+                  if (el && !editableForms[form.pronoun] && form.verbForm) {
+                    el.innerHTML = highlighted;
+                  }
                 }}
-                style={{ 
-                  outline: 'none', 
+                style={{
+                  outline: 'none',
                   minHeight: '20px',
-                  backgroundColor: editableForms[form.pronoun] !== undefined ? 'rgba(200, 220, 255, 0.3)' : 'transparent'
+                  backgroundColor: editableForms[form.pronoun] ? 'rgba(200, 220, 255, 0.3)' : 'transparent'
                 }}
               />
             </tr>
