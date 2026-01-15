@@ -684,41 +684,11 @@ const InfoTable = ({ partOfSpeech, gender }) => {
 };
 
 // Компонент для таблицы на белом фоне (обратная сторона карточки)
-const ConjugationTableWhite = ({ conjugation, word, isEditable = false, onEditableFormsChange }) => {
-  const [editableForms, setEditableForms] = React.useState({});
-  const cellRefs = React.useRef({});
-  
-  // Отправляем отредактированные формы наружу когда они меняются
-  React.useEffect(() => {
-    if (onEditableFormsChange && Object.keys(editableForms).length > 0) {
-      onEditableFormsChange(editableForms);
-    }
-  }, [editableForms, onEditableFormsChange]);
+const ConjugationTableWhite = ({ conjugation, word }) => {
   
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
-
-  // Обработчик Ctrl+B для выделения жирным
-  const handleKeyDown = (e, pronoun) => {
-    if (e.ctrlKey && e.key === 'b') {
-      e.preventDefault();
-      const selection = window.getSelection();
-      if (selection.toString()) {
-        document.execCommand('bold', false, null);
-      }
-    }
-  };
-
-  const handleChange = (e, pronoun) => {
-    if (e && e.currentTarget) {
-      const html = e.currentTarget.innerHTML;
-      setEditableForms(prev => ({
-        ...prev,
-        [pronoun]: html
-      }));
-    }
-  };
 
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
@@ -904,17 +874,8 @@ const ConjugationTableWhite = ({ conjugation, word, isEditable = false, onEditab
                 {form.pronoun}
               </td>
               <td 
-                contentEditable={isEditable}
-                suppressContentEditableWarning
-                className={`text-left ${isEditable ? 'cursor-text' : 'cursor-default'}`}
-                onKeyDown={isEditable ? (e) => handleKeyDown(e, form.pronoun) : undefined}
-                onInput={isEditable ? (e) => handleChange(e, form.pronoun) : undefined}
-                ref={(el) => {
-                  cellRefs.current[form.pronoun] = el;
-                  if (el && !editableForms[form.pronoun] && form.verbForm) {
-                    el.innerHTML = highlighted;
-                  }
-                }}
+                className="text-left"
+                dangerouslySetInnerHTML={{ __html: highlighted }}
                 style={{
                   borderTopRightRadius: isFirst ? '16px' : '0',
                   borderBottomRightRadius: isLast ? '16px' : '0',
@@ -923,11 +884,7 @@ const ConjugationTableWhite = ({ conjugation, word, isEditable = false, onEditab
                   borderBottom: '2px solid rgba(0, 0, 0, 0.08)',
                   padding: '12px 16px',
                   flex: 1,
-                  textTransform: 'capitalize',
-                  outline: isEditable ? 'none' : 'none',
-                  minHeight: '20px',
-                  backgroundColor: isEditable && editableForms[form.pronoun] ? 'rgba(200, 220, 255, 0.3)' : 'transparent',
-                  userSelect: isEditable ? 'text' : 'none'
+                  textTransform: 'capitalize'
                 }}
               />
             </tr>
@@ -940,32 +897,9 @@ const ConjugationTableWhite = ({ conjugation, word, isEditable = false, onEditab
 
 // Компонент для отображения спряжения в таблице
 const ConjugationTable = ({ conjugation, word }) => {
-  const [editableForms, setEditableForms] = React.useState({});
-  const cellRefs = React.useRef({});
-  
   const lines = conjugation.split('\n');
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
-
-  // Обработчик Ctrl+B для выделения жирным
-  const handleKeyDown = (e, pronoun) => {
-    if (e.ctrlKey && e.key === 'b') {
-      e.preventDefault();
-      const selection = window.getSelection();
-      if (selection.toString()) {
-        document.execCommand('bold', false, null);
-      }
-    }
-  };
-
-  const handleChange = (e, pronoun) => {
-    if (e && e.currentTarget) {
-      setEditableForms(prev => ({
-        ...prev,
-        [pronoun]: e.currentTarget.innerHTML
-      }));
-    }
-  };
 
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
@@ -1129,22 +1063,8 @@ const ConjugationTable = ({ conjugation, word }) => {
                 {form.pronoun}
               </td>
               <td 
-                contentEditable
-                suppressContentEditableWarning
-                className="py-4 px-4 text-left cursor-text"
-                onKeyDown={(e) => handleKeyDown(e, form.pronoun)}
-                onInput={(e) => handleChange(e, form.pronoun)}
-                ref={(el) => {
-                  cellRefs.current[form.pronoun] = el;
-                  if (el && !editableForms[form.pronoun] && form.verbForm) {
-                    el.innerHTML = highlighted;
-                  }
-                }}
-                style={{
-                  outline: 'none',
-                  minHeight: '20px',
-                  backgroundColor: editableForms[form.pronoun] ? 'rgba(200, 220, 255, 0.3)' : 'transparent'
-                }}
+                className="py-4 px-4 text-left"
+                dangerouslySetInnerHTML={{ __html: highlighted }}
               />
             </tr>
           );
@@ -1156,13 +1076,17 @@ const ConjugationTable = ({ conjugation, word }) => {
 
 // Основной компонент приложения
 export default function FrenchFlashCardsApp() {
+  // Константы для слайдера карточек
+  const CARD_WIDTH = 614;  // Ширина контейнера слайдера
+  const CARD_GAP = 16;     // Gap между карточками
+  const SLIDE_WIDTH = CARD_WIDTH + CARD_GAP;  // 630px - полная ширина одного слайда
+  
   const [topics, setTopics] = useState([]);
   const [currentTopic, setCurrentTopic] = useState(null);
   const [newTopicName, setNewTopicName] = useState('');
   const [newFrench, setNewFrench] = useState('');
   const [newRussian, setNewRussian] = useState('');
   const [conjugation, setConjugation] = useState(null);
-  const [editableForms, setEditableForms] = useState({});
   const [loadingTranslation, setLoadingTranslation] = useState(false);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [wordsAddedCount, setWordsAddedCount] = useState(0);
@@ -1434,7 +1358,6 @@ export default function FrenchFlashCardsApp() {
   const clearTranslation = () => {
     setNewRussian('');
     setConjugation(null);
-    setEditableForms({});
   };
 
   // Парсинг response и построение conjugationText
@@ -1648,7 +1571,7 @@ export default function FrenchFlashCardsApp() {
 
     // Обновляем conjugation с отредактированными значениями
     let updatedConjugation = conjugation;
-    if (conjugation && (editablePartOfSpeech || editableTypeOfWord || Object.keys(editableForms).length > 0)) {
+    if (conjugation && (editablePartOfSpeech || editableTypeOfWord)) {
       let newConjugation = conjugation;
       if (editablePartOfSpeech) {
         newConjugation = newConjugation.replace(/Часть речи: [^\n]+/, `Часть речи: ${editablePartOfSpeech}`);
@@ -1656,31 +1579,6 @@ export default function FrenchFlashCardsApp() {
       if (editableTypeOfWord) {
         newConjugation = newConjugation.replace(/Род: [^\n]+/, `Род: ${editableTypeOfWord}`);
       }
-      
-      // Заменяем отредактированные формы в conjugation
-      if (Object.keys(editableForms).length > 0) {
-        const lines = newConjugation.split('\n');
-        const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
-        
-        if (formsStart !== -1) {
-          const formLines = [];
-          const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-          
-          // Строим новые строки спряжения
-          for (const pronoun of pronouns) {
-            if (editableForms[pronoun]) {
-              // Удаляем HTML теги для сохранения
-              const cleanForm = editableForms[pronoun].replace(/<[^>]*>/g, '');
-              formLines.push(cleanForm);
-            } else if (lines[formsStart + pronouns.indexOf(pronoun)]) {
-              formLines.push(lines[formsStart + pronouns.indexOf(pronoun)]);
-            }
-          }
-          
-          newConjugation = lines.slice(0, formsStart).join('\n') + '\n' + formLines.join('\n');
-        }
-      }
-      
       updatedConjugation = newConjugation;
     }
 
@@ -3870,8 +3768,6 @@ export default function FrenchFlashCardsApp() {
                       <ConjugationTableWhite 
                         conjugation={conjugation}
                         word={newFrench}
-                        isEditable={true}
-                        onEditableFormsChange={setEditableForms}
                       />
                     </div>
                   )}
@@ -3887,7 +3783,6 @@ export default function FrenchFlashCardsApp() {
                     setConjugation(null);
                     setEditablePartOfSpeech('');
                     setEditableTypeOfWord('');
-                    setEditableForms({});
                   }}
                   style={{
                     width: '56px',
@@ -3987,16 +3882,16 @@ export default function FrenchFlashCardsApp() {
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              style={{ cursor: isDragging ? 'grabbing' : 'grab', width: '614px', height: '560px', touchAction: 'pan-y', userSelect: 'none' }}
+              style={{ cursor: isDragging ? 'grabbing' : 'grab', width: `${CARD_WIDTH}px`, height: '560px', touchAction: 'pan-y', userSelect: 'none' }}
             >
               {/* Контейнер слайдера */}
               <div
                 className="flex h-full transition-transform"
                 style={{
-                  transform: `translateX(calc(${-currentCardIndex * 100}% + ${slideOffset}px))`,
+                  transform: `translateX(calc(${-currentCardIndex * SLIDE_WIDTH}px + ${slideOffset}px))`,
                   transitionDuration: isDragging ? '0ms' : '300ms',
                   transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-                  gap: '16px',
+                  gap: `${CARD_GAP}px`,
                 }}
               >
                 {cards.map((card, idx) => (
@@ -4077,7 +3972,6 @@ export default function FrenchFlashCardsApp() {
                             <ConjugationTableWhite 
                               conjugation={card.conjugation}
                               word={card.french}
-                              isEditable={false}
                             />
                           </div>
                         )}
