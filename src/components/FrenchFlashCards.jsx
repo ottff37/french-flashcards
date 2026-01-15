@@ -3807,9 +3807,10 @@ export default function FrenchFlashCardsApp() {
               <div
                 className="flex h-full transition-transform"
                 style={{
-                  transform: `translateX(calc(${-currentCardIndex * 100}% + ${slideOffset}px))`,
+                  transform: `translateX(calc(-${currentCardIndex * 100}% - ${currentCardIndex * 16}px + ${slideOffset}px))`,
                   transitionDuration: isDragging ? '0ms' : '300ms',
                   transitionTimingFunction: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+                  gap: '16px',
                   width: '100%',
                   display: 'flex',
                   flexDirection: 'row',
@@ -3822,7 +3823,6 @@ export default function FrenchFlashCardsApp() {
                     onClick={() => canFlip && !isDragging && setFlipped(!flipped)}
                     style={{
                       padding: '0 16px',
-                      margin: '0 8px',
                       boxSizing: 'border-box',
                       userSelect: 'none',
                       minWidth: '100%',
