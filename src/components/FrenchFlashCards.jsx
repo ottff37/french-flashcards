@@ -1799,6 +1799,72 @@ export default function FrenchFlashCardsApp() {
     }
   };
 
+  // ========== CARD POINTER HANDLERS (для touch drag на мобилке) ==========
+  
+  const handleCardPointerDown = (e, cardIndex) => {
+    // Только для сенсорного ввода (touch)
+    if (e.pointerType === 'touch') {
+      setDraggedCardIndex(cardIndex);
+      console.log('Pointer down on card:', cardIndex);
+    }
+  };
+
+  const handleCardPointerMove = (e, cardIndex) => {
+    if (draggedCardIndex === null || draggedCardIndex === undefined || e.pointerType !== 'touch') {
+      return;
+    }
+    
+    e.preventDefault();
+    
+    try {
+      const currentY = e.clientY;
+      
+      const cardsList = document.querySelector('.cards-list-container');
+      if (!cardsList) return;
+      
+      const allCardElements = Array.from(cardsList.querySelectorAll('.card-item'));
+      let foundElement = false;
+      
+      for (let element of allCardElements) {
+        const rect = element.getBoundingClientRect();
+        if (currentY >= rect.top && currentY <= rect.bottom) {
+          foundElement = true;
+          const hoveredIndex = parseInt(element.getAttribute('data-card-index'), 10);
+          
+          if (hoveredIndex !== draggedCardIndex && draggedCardIndex !== null) {
+            const newCards = [...cards];
+            const [draggedCard] = newCards.splice(draggedCardIndex, 1);
+            newCards.splice(hoveredIndex, 0, draggedCard);
+            
+            setDraggedCardIndex(hoveredIndex);
+            const updatedTopic = {
+              ...currentTopic,
+              cards: newCards
+            };
+            updateCurrentTopic([updatedTopic]);
+          }
+          
+          setDragOverCardIndex(hoveredIndex);
+          break;
+        }
+      }
+      
+      if (!foundElement) {
+        setDragOverCardIndex(null);
+      }
+    } catch (error) {
+      console.error('Error in handleCardPointerMove:', error);
+    }
+  };
+
+  const handleCardPointerUp = (e) => {
+    if (e.pointerType === 'touch') {
+      console.log('Pointer up - clearing card drag state');
+      setDraggedCardIndex(null);
+      setDragOverCardIndex(null);
+    }
+  };
+
   // Drag and drop для карточек слов
   const handleCardDragStart = (e, cardIndex) => {
     setDraggedCardIndex(cardIndex);
@@ -3833,10 +3899,15 @@ export default function FrenchFlashCardsApp() {
               }} className="text-black unified-section-header">
                 {cards.length} {cards.length === 1 ? 'word' : 'words'}
               </h2>
-              <div className="flex flex-col" style={{ gap: '12px' }}>
+              <div className="flex flex-col cards-list-container" style={{ gap: '12px' }}>
                 {cards.map((card, idx) => (
                   <div
                     key={idx}
+                    data-card-index={idx}
+                    className="card-item flex items-center gap-4 cursor-pointer hover:bg-black/2 transition"
+                    onPointerDown={(e) => handleCardPointerDown(e, idx)}
+                    onPointerMove={(e) => handleCardPointerMove(e, idx)}
+                    onPointerUp={handleCardPointerUp}
                     style={{
                       border: '1.5px solid rgba(0, 0, 0, 0.08)',
                       boxSizing: 'border-box',
@@ -3844,7 +3915,6 @@ export default function FrenchFlashCardsApp() {
                       overflow: 'visible',
                       padding: '0.9rem',
                     }}
-                    className="flex items-center gap-4 cursor-pointer hover:bg-black/2 transition"
                   >
                     {/* Left icon */}
                     <svg 
