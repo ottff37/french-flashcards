@@ -2285,8 +2285,12 @@ export default function FrenchFlashCardsApp() {
     
     setIsDragging(false);
     const distance = e.clientX - dragStart;
-    
-    if (Math.abs(distance) > 50 && cards.length > 0 && wasDragged) {
+
+    // iOS Safari может триггерить совместимые mouse events после touch-свайпа.
+    // Поэтому здесь нельзя использовать несуществующий `cards` и нужно безопасно брать cards из currentTopic.
+    const topicCardsCount = currentTopic?.cards?.length || 0;
+
+    if (Math.abs(distance) > 50 && topicCardsCount > 0 && wasDragged) {
       setCanFlip(false);
       if (distance > 0) {
         // Свайп вправо → предыдущая карточка
