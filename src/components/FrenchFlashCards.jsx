@@ -1194,6 +1194,86 @@ export default function FrenchFlashCardsApp() {
   const topicHoverIdRef = useRef(null);
   const suppressNextTopicClickRef = useRef(0);
 
+  // Prevent page scroll while a topic drag is active on touch devices (iOS Safari needs a non-passive touchmove listener)
+  const topicScrollBlockerRef = useRef(null);
+  const TOPIC_TOUCHMOVE_OPTIONS = useRef({ passive: false });
+  const topicPrevTouchActionRef = useRef(null);
+
+  const enableTopicScrollBlock = () => {
+    if (topicScrollBlockerRef.current) return;
+    const blocker = (ev) => {
+      ev.preventDefault();
+    };
+    topicScrollBlockerRef.current = blocker;
+    window.addEventListener('touchmove', blocker, TOPIC_TOUCHMOVE_OPTIONS.current);
+  };
+
+  const disableTopicScrollBlock = () => {
+    if (!topicScrollBlockerRef.current) return;
+    window.removeEventListener('touchmove', topicScrollBlockerRef.current, TOPIC_TOUCHMOVE_OPTIONS.current);
+    topicScrollBlockerRef.current = null;
+  };
+
+  const cleanupTopicTouchDrag = () => {
+    if (topicHoldTimeoutRef.current) {
+      clearTimeout(topicHoldTimeoutRef.current);
+      topicHoldTimeoutRef.current = null;
+    }
+    disableTopicScrollBlock();
+
+    // Restore original touch-action to keep the page scrollable
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
+
+    // Release capture (if any)
+    try {
+      if (topicPointerTargetRef.current && topicPointerIdRef.current != null) {
+        topicPointerTargetRef.current.releasePointerCapture?.(topicPointerIdRef.current);
+      }
+    } catch (_) {}
+
+    // Ensure we always restore scrolling after a drag
+    disableTopicScrollBlock();
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
+
+    topicPointerIdRef.current = null;
+    topicPointerTargetRef.current = null;
+    topicDragActivatedRef.current = false;
+    topicDragMovedRef.current = false;
+    topicStartIdRef.current = null;
+    topicHoverIdRef.current = null;
+
+    setPointerDownTopic(null);
+    setPointerDownTime(null);
+    setTouchDragTopicId(null);
+    setTouchDragOverTopicId(null);
+  };
+
+  // Safety net: on iOS Safari pointerup can be lost; always cleanup to avoid "page stuck / not scrollable" bugs
+  useEffect(() => {
+    const onUp = () => cleanupTopicTouchDrag();
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onUp);
+    document.addEventListener('visibilitychange', onUp);
+    return () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onUp);
+      document.removeEventListener('visibilitychange', onUp);
+    };
+  }, []);
+
+
   // Загрузка данных из storage при загрузке
   useEffect(() => {
     loadTopics();
@@ -1988,6 +2068,13 @@ export default function FrenchFlashCardsApp() {
     topicHoldTimeoutRef.current = setTimeout(() => {
       // Activate drag
       topicDragActivatedRef.current = true;
+      enableTopicScrollBlock();
+      try {
+        if (topicPointerTargetRef.current) {
+          topicPrevTouchActionRef.current = topicPointerTargetRef.current.style.touchAction;
+          topicPointerTargetRef.current.style.touchAction = 'none';
+        }
+      } catch (_) {}
       setTouchDragTopicId(topicId);
     }, TOPIC_HOLD_MS);
   };
@@ -2004,6 +2091,7 @@ export default function FrenchFlashCardsApp() {
           clearTimeout(topicHoldTimeoutRef.current);
           topicHoldTimeoutRef.current = null;
         }
+        cleanupTopicTouchDrag();
       }
       return;
     }
@@ -2053,6 +2141,9 @@ export default function FrenchFlashCardsApp() {
       topicHoldTimeoutRef.current = null;
     }
 
+    // If we started drag, ensure page scroll is re-enabled
+    disableTopicScrollBlock();
+
     // Release capture
     try {
       if (topicPointerTargetRef.current && topicPointerIdRef.current != null) {
@@ -2081,6 +2172,15 @@ export default function FrenchFlashCardsApp() {
         }
       }
     }
+
+    // Ensure we always restore scrolling after a drag
+    disableTopicScrollBlock();
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
 
     topicPointerIdRef.current = null;
     topicPointerTargetRef.current = null;
@@ -2168,6 +2268,7 @@ export default function FrenchFlashCardsApp() {
   const wordCardStartYRef = useRef(null);
   // Use the same options object for add/remove on iOS Safari reliability
   const WORD_CARD_TOUCHMOVE_OPTIONS = useRef({ passive: false });
+  const wordCardPrevTouchActionRef = useRef(null);
 
   const enableWordCardScrollBlock = () => {
     if (wordCardScrollBlockerRef.current) return;
@@ -2192,6 +2293,15 @@ export default function FrenchFlashCardsApp() {
       wordCardHoldTimeoutRef.current = null;
     }
     disableWordCardScrollBlock();
+
+    // Restore original touch-action to keep the page scrollable
+    try {
+      if (wordCardPointerTargetRef.current) {
+        wordCardPointerTargetRef.current.style.touchAction = wordCardPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    wordCardPrevTouchActionRef.current = null;
+
     setIsTouchWordCardDragging(false);
     setTouchDraggedWordCardIndex(null);
     setTouchDragOverWordCardIndex(null);
@@ -2244,6 +2354,12 @@ export default function FrenchFlashCardsApp() {
     wordCardHoldTimeoutRef.current = setTimeout(() => {
       setIsTouchWordCardDragging(true);
       enableWordCardScrollBlock();
+      try {
+        if (wordCardPointerTargetRef.current) {
+          wordCardPrevTouchActionRef.current = wordCardPointerTargetRef.current.style.touchAction;
+          wordCardPointerTargetRef.current.style.touchAction = 'none';
+        }
+      } catch (_) {}
     }, WORD_CARD_HOLD_MS);
   };
 
