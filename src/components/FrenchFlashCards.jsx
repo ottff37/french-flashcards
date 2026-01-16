@@ -669,31 +669,6 @@ if (typeof document !== 'undefined') {
       }
     }
     
-
-/* === Russian word capitalization everywhere === */
-.russian-word,
-.word-card-russian,
-.interactive-card-russian,
-.word-card .russian-word,
-.word-card [data-lang="ru"],
-.word-card .word-translation,
-.interactive-card .russian-word,
-.interactive-card [data-lang="ru"],
-.interactive-word-card .word-translation,
-.word-title,
-.word-title-ru {
-  text-transform: capitalize;
-}
-
-/* Force capitalize for inline-styled RU paragraphs (rendered as <p style="...font-size: 32px..."> etc.) */
-p[style*="font-size: 32px"] {
-  text-transform: capitalize !important;
-}
-p[style*="font-size: 14px"][style*="rgba(0, 0, 0, 0.4)"],
-p[style*="font-size: 14px"][style*="rgba(0,0,0,0.4)"] {
-  text-transform: capitalize !important;
-}
-
 `;
   document.head.appendChild(style);
 }
@@ -726,29 +701,26 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
+
+    const cleanVerb = String(verbForm).trim();
+    let cleanBase = String(baseWord).trim();
+
+    // Remove reflexive prefix from base word for comparison
     if (cleanBase.toLowerCase().startsWith('se ')) {
       cleanBase = cleanBase.substring(3).trim();
     } else if (cleanBase.toLowerCase().startsWith("s'")) {
       cleanBase = cleanBase.substring(2).trim();
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
+
+    // Split reflexive pronoun prefix from the conjugated form (me/te/se/nous/vous/m'/t'/s')
+    const reflexiveMatch = cleanVerb.match(/^((?:m'|t'|s'|me|te|se|nous|vous)\s+)/i);
+    const reflexivePrefix = reflexiveMatch ? reflexiveMatch[1] : '';
+    const verbWithoutReflexive = cleanVerb.slice(reflexivePrefix.length).trim();
+
+    // For matching, compare stems in lowercase
     let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
+
+    // Remove typical French infinitive endings to better match the stem
     if (baseForMatching.endsWith('er')) {
       baseForMatching = baseForMatching.slice(0, -2);
     } else if (baseForMatching.endsWith('ir')) {
@@ -758,33 +730,32 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
     } else if (baseForMatching.endsWith('oir')) {
       baseForMatching = baseForMatching.slice(0, -3);
     }
-    
-    // Находим где кончается корень
+
+    const comparison = verbWithoutReflexive.toLowerCase();
+
+    // Find common prefix length (stem)
     let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
+    const minLength = Math.min(baseForMatching.length, comparison.length);
+
     for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
+      if (baseForMatching[i] === comparison[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
+
+    // If the match is too short, don't highlight
     if (commonLength < 3) {
       return cleanVerb;
     }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
+
+    if (commonLength > 0 && commonLength < verbWithoutReflexive.length) {
+      const root = verbWithoutReflexive.substring(0, commonLength);
+      const ending = verbWithoutReflexive.substring(commonLength);
+      return `${reflexivePrefix}${root}<b>${ending}</b>`;
     }
-    
+
     return cleanVerb;
   };
 
@@ -937,29 +908,26 @@ const ConjugationTable = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
+
+    const cleanVerb = String(verbForm).trim();
+    let cleanBase = String(baseWord).trim();
+
+    // Remove reflexive prefix from base word for comparison
     if (cleanBase.toLowerCase().startsWith('se ')) {
       cleanBase = cleanBase.substring(3).trim();
     } else if (cleanBase.toLowerCase().startsWith("s'")) {
       cleanBase = cleanBase.substring(2).trim();
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
+
+    // Split reflexive pronoun prefix from the conjugated form (me/te/se/nous/vous/m'/t'/s')
+    const reflexiveMatch = cleanVerb.match(/^((?:m'|t'|s'|me|te|se|nous|vous)\s+)/i);
+    const reflexivePrefix = reflexiveMatch ? reflexiveMatch[1] : '';
+    const verbWithoutReflexive = cleanVerb.slice(reflexivePrefix.length).trim();
+
+    // For matching, compare stems in lowercase
     let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
+
+    // Remove typical French infinitive endings to better match the stem
     if (baseForMatching.endsWith('er')) {
       baseForMatching = baseForMatching.slice(0, -2);
     } else if (baseForMatching.endsWith('ir')) {
@@ -969,33 +937,32 @@ const ConjugationTable = ({ conjugation, word }) => {
     } else if (baseForMatching.endsWith('oir')) {
       baseForMatching = baseForMatching.slice(0, -3);
     }
-    
-    // Находим где кончается корень
+
+    const comparison = verbWithoutReflexive.toLowerCase();
+
+    // Find common prefix length (stem)
     let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
+    const minLength = Math.min(baseForMatching.length, comparison.length);
+
     for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
+      if (baseForMatching[i] === comparison[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
+
+    // If the match is too short, don't highlight
     if (commonLength < 3) {
       return cleanVerb;
     }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
+
+    if (commonLength > 0 && commonLength < verbWithoutReflexive.length) {
+      const root = verbWithoutReflexive.substring(0, commonLength);
+      const ending = verbWithoutReflexive.substring(commonLength);
+      return `${reflexivePrefix}${root}<b>${ending}</b>`;
     }
-    
+
     return cleanVerb;
   };
 
@@ -1219,6 +1186,86 @@ export default function FrenchFlashCardsApp() {
   const topicHoverIdRef = useRef(null);
   const suppressNextTopicClickRef = useRef(0);
 
+  // Prevent page scroll while a topic drag is active on touch devices (iOS Safari needs a non-passive touchmove listener)
+  const topicScrollBlockerRef = useRef(null);
+  const TOPIC_TOUCHMOVE_OPTIONS = useRef({ passive: false });
+  const topicPrevTouchActionRef = useRef(null);
+
+  const enableTopicScrollBlock = () => {
+    if (topicScrollBlockerRef.current) return;
+    const blocker = (ev) => {
+      ev.preventDefault();
+    };
+    topicScrollBlockerRef.current = blocker;
+    window.addEventListener('touchmove', blocker, TOPIC_TOUCHMOVE_OPTIONS.current);
+  };
+
+  const disableTopicScrollBlock = () => {
+    if (!topicScrollBlockerRef.current) return;
+    window.removeEventListener('touchmove', topicScrollBlockerRef.current, TOPIC_TOUCHMOVE_OPTIONS.current);
+    topicScrollBlockerRef.current = null;
+  };
+
+  const cleanupTopicTouchDrag = () => {
+    if (topicHoldTimeoutRef.current) {
+      clearTimeout(topicHoldTimeoutRef.current);
+      topicHoldTimeoutRef.current = null;
+    }
+    disableTopicScrollBlock();
+
+    // Restore original touch-action to keep the page scrollable
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
+
+    // Release capture (if any)
+    try {
+      if (topicPointerTargetRef.current && topicPointerIdRef.current != null) {
+        topicPointerTargetRef.current.releasePointerCapture?.(topicPointerIdRef.current);
+      }
+    } catch (_) {}
+
+    // Ensure we always restore scrolling after a drag
+    disableTopicScrollBlock();
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
+
+    topicPointerIdRef.current = null;
+    topicPointerTargetRef.current = null;
+    topicDragActivatedRef.current = false;
+    topicDragMovedRef.current = false;
+    topicStartIdRef.current = null;
+    topicHoverIdRef.current = null;
+
+    setPointerDownTopic(null);
+    setPointerDownTime(null);
+    setTouchDragTopicId(null);
+    setTouchDragOverTopicId(null);
+  };
+
+  // Safety net: on iOS Safari pointerup can be lost; always cleanup to avoid "page stuck / not scrollable" bugs
+  useEffect(() => {
+    const onUp = () => cleanupTopicTouchDrag();
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onUp);
+    document.addEventListener('visibilitychange', onUp);
+    return () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('blur', onUp);
+      document.removeEventListener('visibilitychange', onUp);
+    };
+  }, []);
+
+
   // Загрузка данных из storage при загрузке
   useEffect(() => {
     loadTopics();
@@ -1232,33 +1279,6 @@ export default function FrenchFlashCardsApp() {
       setShowApiKeyModal(true);
     }
   }, []);
-
-  // Close modals by ESC
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key !== 'Escape') return;
-      // Prioritize closing API key modal, then login modal, then celebration modal (if present)
-      if (showApiKeyModal) {
-        e.preventDefault();
-        closeApiKeyModal();
-        return;
-      }
-      if (showLoginModal) {
-        e.preventDefault();
-        closeLoginModal();
-        return;
-      }
-      if (showCelebrationModal) {
-        e.preventDefault();
-        setShowCelebrationModal(false);
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showApiKeyModal, showLoginModal, showCelebrationModal]);
-
 
   // Глобальные обработчики для drag-drop на странице
   useEffect(() => {
@@ -1413,22 +1433,6 @@ export default function FrenchFlashCardsApp() {
       activeElement.blur();
     }
   };
-
-  // Close modals (used for ESC key and outside click) — keep behavior same as Cancel buttons
-  const closeApiKeyModal = () => {
-    setShowApiKeyModal(false);
-    setTempApiKey('');
-    setApiKeyError('');
-    setShowPassword(false);
-    hideKeyboard();
-  };
-
-  const closeLoginModal = () => {
-    setShowLoginModal(false);
-    setTempLoginUserId('');
-    hideKeyboard();
-  };
-
 
   // Функция экспорта всех тем
   // Загрузка всех тем
@@ -2056,6 +2060,13 @@ export default function FrenchFlashCardsApp() {
     topicHoldTimeoutRef.current = setTimeout(() => {
       // Activate drag
       topicDragActivatedRef.current = true;
+      enableTopicScrollBlock();
+      try {
+        if (topicPointerTargetRef.current) {
+          topicPrevTouchActionRef.current = topicPointerTargetRef.current.style.touchAction;
+          topicPointerTargetRef.current.style.touchAction = 'none';
+        }
+      } catch (_) {}
       setTouchDragTopicId(topicId);
     }, TOPIC_HOLD_MS);
   };
@@ -2072,6 +2083,7 @@ export default function FrenchFlashCardsApp() {
           clearTimeout(topicHoldTimeoutRef.current);
           topicHoldTimeoutRef.current = null;
         }
+        cleanupTopicTouchDrag();
       }
       return;
     }
@@ -2121,6 +2133,9 @@ export default function FrenchFlashCardsApp() {
       topicHoldTimeoutRef.current = null;
     }
 
+    // If we started drag, ensure page scroll is re-enabled
+    disableTopicScrollBlock();
+
     // Release capture
     try {
       if (topicPointerTargetRef.current && topicPointerIdRef.current != null) {
@@ -2149,6 +2164,15 @@ export default function FrenchFlashCardsApp() {
         }
       }
     }
+
+    // Ensure we always restore scrolling after a drag
+    disableTopicScrollBlock();
+    try {
+      if (topicPointerTargetRef.current) {
+        topicPointerTargetRef.current.style.touchAction = topicPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    topicPrevTouchActionRef.current = null;
 
     topicPointerIdRef.current = null;
     topicPointerTargetRef.current = null;
@@ -2236,6 +2260,7 @@ export default function FrenchFlashCardsApp() {
   const wordCardStartYRef = useRef(null);
   // Use the same options object for add/remove on iOS Safari reliability
   const WORD_CARD_TOUCHMOVE_OPTIONS = useRef({ passive: false });
+  const wordCardPrevTouchActionRef = useRef(null);
 
   const enableWordCardScrollBlock = () => {
     if (wordCardScrollBlockerRef.current) return;
@@ -2260,6 +2285,15 @@ export default function FrenchFlashCardsApp() {
       wordCardHoldTimeoutRef.current = null;
     }
     disableWordCardScrollBlock();
+
+    // Restore original touch-action to keep the page scrollable
+    try {
+      if (wordCardPointerTargetRef.current) {
+        wordCardPointerTargetRef.current.style.touchAction = wordCardPrevTouchActionRef.current ?? '';
+      }
+    } catch (_) {}
+    wordCardPrevTouchActionRef.current = null;
+
     setIsTouchWordCardDragging(false);
     setTouchDraggedWordCardIndex(null);
     setTouchDragOverWordCardIndex(null);
@@ -2312,6 +2346,12 @@ export default function FrenchFlashCardsApp() {
     wordCardHoldTimeoutRef.current = setTimeout(() => {
       setIsTouchWordCardDragging(true);
       enableWordCardScrollBlock();
+      try {
+        if (wordCardPointerTargetRef.current) {
+          wordCardPrevTouchActionRef.current = wordCardPointerTargetRef.current.style.touchAction;
+          wordCardPointerTargetRef.current.style.touchAction = 'none';
+        }
+      } catch (_) {}
     }, WORD_CARD_HOLD_MS);
   };
 
@@ -2618,7 +2658,7 @@ export default function FrenchFlashCardsApp() {
   const renderGlobalModals = () => (
     <>
       {showApiKeyModal && (
-        <div className="celebration-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closeApiKeyModal(); }} style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -2630,7 +2670,7 @@ export default function FrenchFlashCardsApp() {
           justifyContent: 'center',
           zIndex: 1000,
         }}>
-          <div className="celebration-modal-content api-key-modal-content" style={{
+          <div className="celebration-modal-content" style={{
             backgroundColor: '#ffffff',
             borderRadius: '24px',
             textAlign: 'center',
@@ -2696,74 +2736,112 @@ export default function FrenchFlashCardsApp() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
-                    marginTop: '12px',
                   }}>
-                    <svg width="26" height="26" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm-40-280h80v-240h-80v240Zm0 120h80v-80h-80v80Z"/>
+                    <svg width="24" height="24" viewBox="0 -960 960 960" fill="#000000">
+                      <path d="M280-400q-33 0-56.5-23.5T200-480q0-33 23.5-56.5T280-560q33 0 56.5 23.5T360-480q0 33-23.5 56.5T280-400Zm0 160q-100 0-170-70T40-480q0-100 70-170t170-70q67 0 121.5 33t86.5 87h352l120 120-180 180-80-60-80 60-85-60h-47q-32 54-86.5 87T280-240Zm0-80q56 0 98.5-34t56.5-86h125l58 41 82-61 71 55 75-75-40-40H435q-14-52-56.5-86T280-640q-66 0-113 47t-47 113q0 66 47 113t113 47Z"/>
                     </svg>
                   </div>
-
-                  {/* Input */}
+                  
+                  {/* Input Container */}
                   <div style={{
                     flex: 1,
+                    position: 'relative',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
+                    alignItems: 'center',
                   }}>
-                    <div style={{
-                      display: 'flex',
-                      gap: '12px',
-                      alignItems: 'center',
-                    }}>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={tempApiKey}
-                        onChange={(e) => {
-                          setTempApiKey(e.target.value);
-                          if (apiKeyError) setApiKeyError('');
-                        }}
-                        placeholder="Enter Gemini API Key"
-                        className="uniform-input"
-                        style={{
-                          flex: 1,
-                          borderRadius: '12px',
-                        }}
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '12px',
-                          border: 'none',
-                          backgroundColor: 'rgba(0, 0, 0, 0.07)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                        }}
-                        title={showPassword ? 'Hide' : 'Show'}
-                      >
-                        {showPassword ? '🙈' : '👁️'}
-                      </button>
-                    </div>
-
-                    {/* Error message */}
-                    {apiKeyError && (
-                      <div style={{
+                    {/* Input */}
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={tempApiKey}
+                      onChange={(e) => {
+                        setTempApiKey(e.target.value);
+                        setApiKeyError(''); // Очищаем ошибку при вводе
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          const error = validateApiKey(tempApiKey);
+                          if (!error) {
+                            localStorage.setItem('gemini_api_key', tempApiKey);
+                            setApiKey(tempApiKey);
+                            setShowApiKeyModal(false);
+                            setApiKeyError('');
+                            setTempApiKey('');
+                            setShowPassword(false);
+                          } else {
+                            setApiKeyError(error);
+                          }
+                        }
+                      }}
+                      placeholder="Starts with Alza"
+                      style={{
+                        width: '100%',
+                        height: '56px',
+                        padding: '0 50px 0 20px',
+                        border: apiKeyError ? '1.5px solid #DC2626' : '1.5px solid rgba(0, 0, 0, 0.12)',
+                        boxSizing: 'border-box',
                         fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                        fontSize: '14px',
+                        fontSize: '16px',
                         fontWeight: '500',
-                        lineHeight: '20px',
-                        color: '#DC2626',
-                        textAlign: 'left',
-                      }}>
-                        {apiKeyError}
-                      </div>
-                    )}
+                        lineHeight: '24px',
+                        borderRadius: '12px',
+                        backgroundColor: '#ffffff',
+                        color: '#000000',
+                        colorScheme: 'light',
+                        outline: 'none',
+                      }}
+                    />
+                    
+                    {/* Show/Hide Password Button - Inside Input */}
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        transition: 'opacity 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => e.target.style.opacity = '0.6'}
+                      onMouseLeave={(e) => e.target.style.opacity = '1'}
+                    >
+                      {showPassword ? (
+                        // Eye icon (show password)
+                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
+                          <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
+                        </svg>
+                      ) : (
+                        // Eye off icon (hide password)
+                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
+                          <path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
+
+                {/* Error message */}
+                {apiKeyError && (
+                  <div style={{
+                    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    lineHeight: '20px',
+                    color: '#DC2626',
+                    textAlign: 'left',
+                  }}>
+                    {apiKeyError}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2818,7 +2896,11 @@ export default function FrenchFlashCardsApp() {
               {/* Cancel Button */}
               <button
                 onClick={() => {
-                  closeApiKeyModal();
+                  setShowApiKeyModal(false);
+                  setTempApiKey('');
+                  setApiKeyError('');
+                  setShowPassword(false);
+                  hideKeyboard();
                 }}
                 style={{
                   width: '100%',
@@ -2830,9 +2912,13 @@ export default function FrenchFlashCardsApp() {
                   borderRadius: '12px',
                   fontSize: '16px',
                   fontWeight: '600',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  lineHeight: '24px',
                   cursor: 'pointer',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
                 onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
@@ -2925,21 +3011,63 @@ export default function FrenchFlashCardsApp() {
                     <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/>
                   </svg>
                 </div>
-                <input
-                  type="text"
-                  value={loginUserId}
-                  onChange={(e) => setLoginUserId(e.target.value)}
-                  placeholder="Enter your user ID"
-                  className="uniform-input"
-                  style={{
-                    flex: 1,
-                    borderRadius: '12px',
-                  }}
-                />
+
+                {/* Input Wrapper */}
+                <div style={{
+                  flex: 1,
+                  position: 'relative',
+                }}>
+                  <input
+                    type="text"
+                    value={loginUserId}
+                    onChange={(e) => setLoginUserId(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && loginUserId.trim()) {
+                        setShowLoginModal(false);
+                        setLoginUserId('');
+                      }
+                    }}
+                    placeholder="Enter your username"
+                    maxLength="50"
+                    style={{
+                      width: '100%',
+                      height: '56px',
+                      padding: '0 20px',
+                      border: '1.5px solid rgba(0, 0, 0, 0.12)',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                      lineHeight: '24px',
+                      letterSpacing: '0%',
+                      color: '#000000',
+                      backgroundColor: '#ffffff',
+                      colorScheme: 'light',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  {/* Char count */}
+                  <div style={{
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '14px',
+                    lineHeight: '14px',
+                    color: 'rgba(0, 0, 0, 0.4)',
+                    backgroundColor: '#F5F5F5',
+                    padding: '6px',
+                    borderRadius: '6px',
+                  }}>
+                    {loginUserId.length}/50
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Buttons */}
+            {/* Buttons Wrapper */}
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -2947,35 +3075,44 @@ export default function FrenchFlashCardsApp() {
               width: '100%',
               marginTop: 'auto',
             }}>
+              {/* Sign In Button */}
               <button
                 onClick={() => {
-                  setShowLoginModal(false);
-                  // (логин-логика остаётся как была — здесь просто закрываем)
+                  if (loginUserId.trim()) {
+                    setShowLoginModal(false);
+                    setLoginUserId('');
+                    addSuccess(`Welcome, ${loginUserId}!`);
+                  }
                 }}
                 style={{
                   width: '100%',
                   height: '56px',
                   padding: '0 20px',
-                  backgroundColor: '#000000',
-                  color: '#ffffff',
+                  backgroundColor: loginUserId.trim() ? '#000000' : 'rgba(0, 0, 0, 0.05)',
+                  color: loginUserId.trim() ? '#ffffff' : 'rgba(0, 0, 0, 0.3)',
                   border: 'none',
                   borderRadius: '12px',
                   fontSize: '16px',
                   fontWeight: '600',
-                  lineHeight: '24px',
-                  cursor: 'pointer',
                   fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  cursor: loginUserId.trim() ? 'pointer' : 'default',
                   transition: 'background-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
+                onMouseEnter={(e) => {
+                  if (loginUserId.trim()) {
+                    e.target.style.backgroundColor = '#333333';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (loginUserId.trim()) {
+                    e.target.style.backgroundColor = '#000000';
+                  }
+                }}
               >
                 Sign In
               </button>
 
+              {/* Cancel Button */}
               <button
                 onClick={() => {
                   setShowLoginModal(false);
@@ -3390,7 +3527,7 @@ export default function FrenchFlashCardsApp() {
 
       {/* Celebration Modal */}
       {showCelebrationModal && (
-        <div className="celebration-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closeLoginModal(); }} style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
