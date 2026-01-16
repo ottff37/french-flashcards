@@ -27,6 +27,15 @@ if (typeof document !== 'undefined') {
       user-select: none;
       padding-bottom: env(safe-area-inset-bottom);
     }
+
+    /* iOS Home Screen overscroll background fix (keep bounce) */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: #F6F2F2;
+      z-index: -1;
+    }
     
     input, button, textarea, select {
       font-size: 16px !important;
