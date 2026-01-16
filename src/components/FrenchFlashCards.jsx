@@ -62,6 +62,11 @@ if (typeof document !== 'undefined') {
       /* Needed for reliable pointer/touch move events on mobile during reordering */
       touch-action: none;
     }
+
+    /* If the finger starts on an inner element (icon/text), still keep pointer events flowing */
+    .topic-item * {
+      touch-action: none;
+    }
     
     .back-button-sidebar, .export-button-sidebar, .import-button-sidebar {
       width: 56px;
@@ -1157,6 +1162,12 @@ export default function FrenchFlashCardsApp() {
   
   const inputRef = useRef(null);
   const topicTitleRef = useRef(null);
+  // Used to temporarily disable page scrolling while reordering topics on mobile
+  const topicDragScrollLockRef = useRef({
+    bodyOverflow: '',
+    bodyTouchAction: '',
+    htmlTouchAction: ''
+  });
 
   // Загрузка данных из storage при загрузке
   useEffect(() => {
@@ -1908,12 +1919,31 @@ export default function FrenchFlashCardsApp() {
   const handleTopicPointerDown = (e, topicId) => {
     // Только для сенсорного ввода (touch)
     if (e.pointerType === 'touch') {
+      // Stop the browser from turning this into a scroll gesture
+      e.preventDefault();
+      e.stopPropagation();
+
       // Keep receiving pointer move/up even when the finger leaves the element
       try {
         e.currentTarget?.setPointerCapture?.(e.pointerId);
       } catch (_) {
         // ignore
       }
+
+      // Temporarily lock page scroll (iOS Safari otherwise captures the first finger as scrolling)
+      try {
+        const body = document.body;
+        const html = document.documentElement;
+        topicDragScrollLockRef.current.bodyOverflow = body.style.overflow;
+        topicDragScrollLockRef.current.bodyTouchAction = body.style.touchAction;
+        topicDragScrollLockRef.current.htmlTouchAction = html.style.touchAction;
+        body.style.overflow = 'hidden';
+        body.style.touchAction = 'none';
+        html.style.touchAction = 'none';
+      } catch (_) {
+        // ignore
+      }
+
       setPointerDownTopic(topicId);
       setPointerDownTime(Date.now());
       setTouchDragTopicId(topicId);
@@ -1927,6 +1957,7 @@ export default function FrenchFlashCardsApp() {
     }
     
     e.preventDefault();
+    e.stopPropagation();
     // Prevent accidental "open topic" clicks right after reordering
     if (!suppressTopicClick) setSuppressTopicClick(true);
     
@@ -1975,11 +2006,23 @@ export default function FrenchFlashCardsApp() {
 
   const handleTopicPointerUp = (e) => {
     if (e.pointerType === 'touch') {
+      // Restore page scroll
+      try {
+        const body = document.body;
+        const html = document.documentElement;
+        body.style.overflow = topicDragScrollLockRef.current.bodyOverflow || '';
+        body.style.touchAction = topicDragScrollLockRef.current.bodyTouchAction || '';
+        html.style.touchAction = topicDragScrollLockRef.current.htmlTouchAction || '';
+      } catch (_) {
+        // ignore
+      }
+
       console.log('Pointer up - clearing drag state');
       setPointerDownTopic(null);
       setPointerDownTime(null);
       setTouchDragTopicId(null);
       setTouchDragOverTopicId(null);
+
       // Click event may fire after pointerup on mobile
       setTimeout(() => setSuppressTopicClick(false), 200);
     }
@@ -2449,8 +2492,9 @@ export default function FrenchFlashCardsApp() {
                         opacity: (draggedTopicId === topic.id || touchDragTopicId === topic.id) ? 0.5 : 1,
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        // Allow us to prevent scrolling while reordering on touch devices
-                        touchAction: touchDragTopicId ? 'none' : 'manipulation',
+                        // On mobile Safari, `manipulation` can swallow the first finger as a scroll gesture.
+                        // Keep it `none` so press-and-drag works reliably.
+                        touchAction: 'none',
                         pointerEvents: 'auto',
                         transition: 'all 0.15s ease',
                         borderRadius: '20px',
