@@ -17,7 +17,45 @@ if (typeof document !== 'undefined') {
   link.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap';
   link.rel = 'stylesheet';
   document.head.appendChild(link);
-  
+
+  // === iOS / Safari icons (favicon + Home Screen) ===
+  // Note: files must exist in /public: /favicon.ico, /apple-touch-icon.png, /site.webmanifest
+  const ensureLink = ({ rel, href, sizes, type }) => {
+    const selector = `link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ''}`;
+    let el = document.head.querySelector(selector);
+    if (!el) {
+      el = document.createElement('link');
+      el.rel = rel;
+      if (sizes) el.sizes = sizes;
+      if (type) el.type = type;
+      document.head.appendChild(el);
+    }
+    el.href = href;
+    return el;
+  };
+
+  ensureLink({ rel: 'icon', href: '/favicon.ico', type: 'image/x-icon' });
+  ensureLink({ rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' });
+  ensureLink({ rel: 'manifest', href: '/site.webmanifest' });
+
+  const ensureMeta = ({ name, content, property }) => {
+    const selector = name ? `meta[name="${name}"]` : `meta[property="${property}"]`;
+    let el = document.head.querySelector(selector);
+    if (!el) {
+      el = document.createElement('meta');
+      if (name) el.setAttribute('name', name);
+      if (property) el.setAttribute('property', property);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+    return el;
+  };
+
+  // Recommended for PWA-ish appearance; safe even if not used
+  ensureMeta({ name: 'theme-color', content: '#F6F2F2' });
+  ensureMeta({ name: 'apple-mobile-web-app-capable', content: 'yes' });
+  ensureMeta({ name: 'apple-mobile-web-app-status-bar-style', content: 'default' });
+
   // Add CSS for back button
   const style = document.createElement('style');
   style.textContent = `
@@ -3410,51 +3448,6 @@ export default function FrenchFlashCardsApp() {
               }}>
                 Drag and drop your .json file
               </span>
-            </div>
-          </div>
-
-          {/* Achivments */}
-          <div className="w-[614px] py-8 bg-white rounded-[32px] flex flex-col justify-start items-center gap-3" style={{
-            maxWidth: '614px',
-            width: '100%',
-            margin: '16px auto 0 auto',
-          }}>
-            <div className="self-stretch flex flex-col justify-start items-start gap-4">
-              <div className="self-stretch px-8 inline-flex justify-center items-center gap-2.5">
-                <div className="flex-1 justify-center text-black text-lg font-medium font-['Geist'] leading-7">Achivments</div>
-              </div>
-              <div className="self-stretch pl-8 pr-96 inline-flex justify-start items-start gap-3 overflow-hidden">
-                <div className="w-44 h-56 px-5 py-4 rounded-[20px] inline-flex flex-col justify-center items-center gap-1.5">
-                  <div className="w-11 h-20 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-20 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-20 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-20 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-28 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-28 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-28 bg-zinc-100 rounded-[580px]" />
-                  <div className="w-11 h-28 bg-zinc-100 rounded-[580px]" />
-                  <img className="w-32 h-32" src="https://placehold.co/132x134" alt="" />
-                  <div className="justify-center text-black text-base font-medium font-['Geist'] leading-6">Chill Sirius</div>
-                </div>
-                <div className="w-44 h-56 px-5 py-4 relative rounded-[20px] outline outline-[1.50px] outline-offset-[-1.50px] outline-black/10 flex justify-center items-center gap-2">
-                  <img className="w-32 h-32 blur-md" src="https://placehold.co/132x134" alt="" />
-                  <div className="w-8 h-8 left-[70px] top-[94px] absolute overflow-hidden">
-                    <div className="w-6 h-7 left-[5.33px] top-[1.33px] absolute bg-neutral-200" />
-                  </div>
-                </div>
-                <div className="w-44 h-56 px-5 py-4 relative rounded-[20px] outline outline-[1.50px] outline-offset-[-1.50px] outline-black/10 flex justify-center items-center gap-2">
-                  <img className="w-32 h-32 blur-md" src="https://placehold.co/132x134" alt="" />
-                  <div className="w-8 h-8 left-[70px] top-[94px] absolute overflow-hidden">
-                    <div className="w-6 h-7 left-[5.33px] top-[1.33px] absolute bg-neutral-200" />
-                  </div>
-                </div>
-                <div className="w-44 h-56 px-5 py-4 relative rounded-[20px] outline outline-[1.50px] outline-offset-[-1.50px] outline-black/10 flex justify-center items-center gap-2">
-                  <img className="w-32 h-32 blur-md" src="https://placehold.co/132x134" alt="" />
-                  <div className="w-8 h-8 left-[70px] top-[94px] absolute overflow-hidden">
-                    <div className="w-6 h-7 left-[5.33px] top-[1.33px] absolute bg-neutral-200" />
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
