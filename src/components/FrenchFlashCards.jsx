@@ -1199,6 +1199,45 @@ export default function FrenchFlashCardsApp() {
       setShowApiKeyModal(true);
     }
   }, []);
+  // ===== Persist current screen (topic) across refresh =====
+  const VIEW_STATE_KEY = "french_view_state_v1";
+  const viewStateRestoredRef = useRef(false);
+
+  useEffect(() => {
+    // Persist view state
+    try {
+      const payload = currentTopic
+        ? { screen: "topic", topicId: currentTopic.id, cardIndex: currentCardIndex || 0 }
+        : { screen: "topics" };
+      localStorage.setItem(VIEW_STATE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+  }, [currentTopic, currentCardIndex]);
+
+  useEffect(() => {
+    // Restore view state once topics have loaded
+    if (loading) return;
+    if (viewStateRestoredRef.current) return;
+    viewStateRestoredRef.current = true;
+
+    try {
+      const raw = localStorage.getItem(VIEW_STATE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || saved.screen !== "topic") return;
+
+      const topicId = Number(saved.topicId);
+      const found = topics.find(t => Number(t.id) === topicId);
+      if (found) {
+        setCurrentTopic(found);
+        const idx = Number(saved.cardIndex);
+        setCurrentCardIndex(Number.isFinite(idx) ? idx : 0);
+        setFlipped(false);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [loading, topics]);
+
 
   // Close modals on ESC
   useEffect(() => {
