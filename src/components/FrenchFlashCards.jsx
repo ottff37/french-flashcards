@@ -723,149 +723,137 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
 
-  // Функция для выделения окончания
-  const highlightEnding = (verbForm, baseWord) => {
-    if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
-    if (cleanBase.toLowerCase().startsWith('se ')) {
-      cleanBase = cleanBase.substring(3).trim();
-    } else if (cleanBase.toLowerCase().startsWith("s'")) {
-      cleanBase = cleanBase.substring(2).trim();
+  // Функция для выделения окончания (устойчиво для возвратных глаголов и j'/m'/t'/s')
+const highlightEnding = (verbForm, baseWord) => {
+  if (!baseWord || !verbForm) return verbForm;
+
+  const cleanVerbRaw = String(verbForm).trim();
+  let cleanBase = String(baseWord).trim();
+
+  // Normalize apostrophes for consistent parsing (’ -> ')
+  const normApos = (s) => s.replace(/’/g, "'");
+
+  // Strip reflexive prefixes for comparison only, but keep them in output
+  const stripReflexivePrefix = (s) => {
+    const t = normApos(s).trim();
+    // Common reflexive pronouns in FR conjugations
+    const m = t.match(/^(?:me|te|se|nous|vous)\s+/i) || t.match(/^(?:m'|t'|s')/i);
+    if (!m) return { prefix: "", rest: t };
+    if (m[0].endsWith(" ")) {
+      return { prefix: t.slice(0, m[0].length), rest: t.slice(m[0].length).trim() };
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
-    let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
-    if (baseForMatching.endsWith('er')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('ir')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('re')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('oir')) {
-      baseForMatching = baseForMatching.slice(0, -3);
-    }
-    
-    // Находим где кончается корень
-    let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
-    for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
-        commonLength = i + 1;
-      } else {
-        break;
-      }
-    }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
-    if (commonLength < 3) {
-      return cleanVerb;
-    }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
-    }
-    
-    return cleanVerb;
+    // m'/t'/s'
+    return { prefix: t.slice(0, m[0].length), rest: t.slice(m[0].length).trim() };
   };
 
+  // Base word can be "se ..." or "s'..."
+  const baseParts = stripReflexivePrefix(cleanBase);
+  cleanBase = baseParts.rest;
+
+  const verbParts = stripReflexivePrefix(cleanVerbRaw);
+  const verbRest = verbParts.rest;
+
+  // Diacritics-insensitive matching for stem detection
+  const fold = (s) =>
+    normApos(s)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  // Remove infinitive endings to get a better stem
+  let baseForMatching = fold(cleanBase);
+  if (baseForMatching.endsWith('er')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('ir')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('re')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('oir')) baseForMatching = baseForMatching.slice(0, -3);
+
+  const verbForComparison = fold(verbRest);
+
+  // Find common prefix length (in folded strings)
+  let commonLength = 0;
+  const minLength = Math.min(baseForMatching.length, verbForComparison.length);
+  for (let i = 0; i < minLength; i++) {
+    if (baseForMatching[i] === verbForComparison[i]) commonLength = i + 1;
+    else break;
+  }
+
+  // If the overlap is small, don't highlight (avoid nonsense)
+  const minStem = Math.min(2, minLength);
+  if (commonLength < minStem) return cleanVerbRaw;
+
+  // Map folded commonLength back onto original verbRest by counting folded chars
+  let origCut = 0;
+  let foldedCount = 0;
+  while (origCut < verbRest.length && foldedCount < commonLength) {
+    const ch = verbRest[origCut];
+    const foldedCh = fold(ch);
+    if (foldedCh.length > 0) foldedCount += foldedCh.length;
+    origCut += 1;
+  }
+
+  if (origCut > 0 && origCut < verbRest.length) {
+    const root = verbRest.slice(0, origCut);
+    const ending = verbRest.slice(origCut);
+    return `${verbParts.prefix}${root}<b>${ending}</b>`;
+  }
+
+  return cleanVerbRaw;
+};
+
   const parseConjugation = () => {
-    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-    const result = {};
-    
-    // Инициализируем пустые значения для всех местоимений
-    pronouns.forEach(p => {
-      result[p] = '';
+  const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
+  const result = {};
+  pronouns.forEach(p => (result[p] = ''));
+
+  // Combine forms into one string
+  let text = forms.join(' ').trim();
+  if (!text) {
+    return pronouns.map(p => ({ pronoun: p, verbForm: '' }));
+  }
+
+  // Normalize apostrophes and spacing
+  text = text.replace(/’/g, "'").replace(/\s+/g, ' ').trim();
+
+  // Fast path: comma-separated items
+  if (text.includes(',')) {
+    const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+    parts.forEach((part) => {
+      const m = part.match(/^((?:j'|je)|tu|il\/elle|nous|vous|ils\/elles)\s+/i);
+      if (!m) return;
+      const keyRaw = m[1].toLowerCase();
+      const key = keyRaw === "j'" ? "je" : keyRaw;
+      const verbForm = part.slice(m[0].length).trim();
+      if (key in result && !result[key]) result[key] = verbForm;
     });
-    
-    // Объединяем все формы в одну строку
-    let text = forms.join(' ').trim();
-    
-    // Пытаемся разбить по запятым если они есть
-    if (text.includes(',')) {
-      const parts = text.split(',').map(p => p.trim()).filter(p => p);
-      
-      parts.forEach((part) => {
-        for (const pronoun of pronouns) {
-          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
-          if (regex.test(part)) {
-            const verbForm = part.replace(regex, '').trim();
-            result[pronoun.toLowerCase()] = verbForm;
-            return;
-          }
-        }
+  } else {
+    // General case: find pronoun tokens with a global regex and slice between them
+    const tokenRe = /(?:^| )((?:j'|je)|tu|il\/elle|nous|vous|ils\/elles)\s+/gi;
+    const matches = [];
+    let mm;
+    while ((mm = tokenRe.exec(text)) !== null) {
+      matches.push({
+        keyRaw: mm[1].toLowerCase(),
+        start: mm.index + (mm[0].startsWith(' ') ? 1 : 0),
+        end: mm.index + mm[0].length,
       });
+    }
+
+    if (matches.length === 0) {
+      result['je'] = text;
     } else {
-      // Если нет запятых, ищем местоимения в тексте последовательно
-      let searchText = text;
-      
-      // Сначала ищем все позиции местоимений
-      const pronounPositions = [];
-      for (const pronoun of pronouns) {
-        const regex = new RegExp(`${pronoun}\\s+`, 'i');
-        const match = regex.exec(searchText);
-        
-        if (match) {
-          pronounPositions.push({
-            pronoun: pronoun.toLowerCase(),
-            index: match.index,
-            endIndex: match.index + match[0].length
-          });
-        }
-      }
-      
-      // Если нет местоимений вообще, добавляем всё как "je"
-      if (pronounPositions.length === 0) {
-        result['je'] = searchText;
-      } else {
-        // Сортируем по позиции
-        pronounPositions.sort((a, b) => a.index - b.index);
-        
-        // Если первый найденный текст не начинается с местоимения, добавляем "je"
-        if (pronounPositions[0].index > 0) {
-          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
-          result['je'] = jeForm;
-        }
-        
-        // Извлекаем формы между местоимениями
-        for (let i = 0; i < pronounPositions.length; i++) {
-          const current = pronounPositions[i];
-          const next = pronounPositions[i + 1];
-          
-          const startIdx = current.endIndex;
-          const endIdx = next ? next.index : searchText.length;
-          const verbForm = searchText.substring(startIdx, endIdx).trim();
-          
-          result[current.pronoun] = verbForm;
-        }
+      for (let i = 0; i < matches.length; i++) {
+        const cur = matches[i];
+        const next = matches[i + 1];
+        const key = cur.keyRaw === "j'" ? "je" : cur.keyRaw;
+        const endIdx = next ? next.start : text.length;
+        const verbForm = text.slice(cur.end, endIdx).trim();
+        if (key in result && !result[key]) result[key] = verbForm;
       }
     }
-    
-    // Преобразуем объект в массив в правильном порядке
-    return pronouns.map(p => ({
-      pronoun: p,
-      verbForm: result[p] || ''
-    }));
-  };
+  }
+
+  return pronouns.map(p => ({ pronoun: p, verbForm: result[p] || '' }));
+};
 
   const parsedForms = parseConjugation();
   const baseWord = word ? word.toLowerCase() : '';
@@ -934,149 +922,137 @@ const ConjugationTable = ({ conjugation, word }) => {
   const formsStart = lines.findIndex(line => !line.startsWith('Часть речи:') && !line.startsWith('Род:') && line.trim());
   const forms = formsStart !== -1 ? lines.slice(formsStart) : [];
 
-  // Функция для выделения окончания
-  const highlightEnding = (verbForm, baseWord) => {
-    if (!baseWord || !verbForm) return verbForm;
-    
-    const cleanVerb = verbForm.trim();
-    let cleanBase = baseWord.trim();
-    
-    // Убираем возвратный префикс для сравнения
-    if (cleanBase.toLowerCase().startsWith('se ')) {
-      cleanBase = cleanBase.substring(3).trim();
-    } else if (cleanBase.toLowerCase().startsWith("s'")) {
-      cleanBase = cleanBase.substring(2).trim();
+  // Функция для выделения окончания (устойчиво для возвратных глаголов и j'/m'/t'/s')
+const highlightEnding = (verbForm, baseWord) => {
+  if (!baseWord || !verbForm) return verbForm;
+
+  const cleanVerbRaw = String(verbForm).trim();
+  let cleanBase = String(baseWord).trim();
+
+  // Normalize apostrophes for consistent parsing (’ -> ')
+  const normApos = (s) => s.replace(/’/g, "'");
+
+  // Strip reflexive prefixes for comparison only, but keep them in output
+  const stripReflexivePrefix = (s) => {
+    const t = normApos(s).trim();
+    // Common reflexive pronouns in FR conjugations
+    const m = t.match(/^(?:me|te|se|nous|vous)\s+/i) || t.match(/^(?:m'|t'|s')/i);
+    if (!m) return { prefix: "", rest: t };
+    if (m[0].endsWith(" ")) {
+      return { prefix: t.slice(0, m[0].length), rest: t.slice(m[0].length).trim() };
     }
-    
-    // Убираем возвратный префикс из формы если есть
-    let baseForComparison = cleanVerb;
-    if (cleanVerb.toLowerCase().startsWith('se ')) {
-      baseForComparison = cleanVerb.substring(3).trim();
-    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
-      baseForComparison = cleanVerb.substring(2).trim();
-    }
-    
-    // Пытаемся убрать окончания инфинитива для лучшего сравнения
-    let baseForMatching = cleanBase.toLowerCase();
-    
-    // Убираем типичные французские окончания инфинитива
-    if (baseForMatching.endsWith('er')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('ir')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('re')) {
-      baseForMatching = baseForMatching.slice(0, -2);
-    } else if (baseForMatching.endsWith('oir')) {
-      baseForMatching = baseForMatching.slice(0, -3);
-    }
-    
-    // Находим где кончается корень
-    let commonLength = 0;
-    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
-    
-    for (let i = 0; i < minLength; i++) {
-      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
-        commonLength = i + 1;
-      } else {
-        break;
-      }
-    }
-    
-    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
-    if (commonLength < 3) {
-      return cleanVerb;
-    }
-    
-    if (commonLength > 0 && commonLength < baseForComparison.length) {
-      const root = baseForComparison.substring(0, commonLength);
-      const ending = baseForComparison.substring(commonLength);
-      
-      // Восстанавливаем префикс если был
-      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
-      return `${prefix}${root}<b>${ending}</b>`;
-    }
-    
-    return cleanVerb;
+    // m'/t'/s'
+    return { prefix: t.slice(0, m[0].length), rest: t.slice(m[0].length).trim() };
   };
 
+  // Base word can be "se ..." or "s'..."
+  const baseParts = stripReflexivePrefix(cleanBase);
+  cleanBase = baseParts.rest;
+
+  const verbParts = stripReflexivePrefix(cleanVerbRaw);
+  const verbRest = verbParts.rest;
+
+  // Diacritics-insensitive matching for stem detection
+  const fold = (s) =>
+    normApos(s)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+  // Remove infinitive endings to get a better stem
+  let baseForMatching = fold(cleanBase);
+  if (baseForMatching.endsWith('er')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('ir')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('re')) baseForMatching = baseForMatching.slice(0, -2);
+  else if (baseForMatching.endsWith('oir')) baseForMatching = baseForMatching.slice(0, -3);
+
+  const verbForComparison = fold(verbRest);
+
+  // Find common prefix length (in folded strings)
+  let commonLength = 0;
+  const minLength = Math.min(baseForMatching.length, verbForComparison.length);
+  for (let i = 0; i < minLength; i++) {
+    if (baseForMatching[i] === verbForComparison[i]) commonLength = i + 1;
+    else break;
+  }
+
+  // If the overlap is small, don't highlight (avoid nonsense)
+  const minStem = Math.min(2, minLength);
+  if (commonLength < minStem) return cleanVerbRaw;
+
+  // Map folded commonLength back onto original verbRest by counting folded chars
+  let origCut = 0;
+  let foldedCount = 0;
+  while (origCut < verbRest.length && foldedCount < commonLength) {
+    const ch = verbRest[origCut];
+    const foldedCh = fold(ch);
+    if (foldedCh.length > 0) foldedCount += foldedCh.length;
+    origCut += 1;
+  }
+
+  if (origCut > 0 && origCut < verbRest.length) {
+    const root = verbRest.slice(0, origCut);
+    const ending = verbRest.slice(origCut);
+    return `${verbParts.prefix}${root}<b>${ending}</b>`;
+  }
+
+  return cleanVerbRaw;
+};
+
   const parseConjugation = () => {
-    const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
-    const result = {};
-    
-    // Инициализируем пустые значения для всех местоимений
-    pronouns.forEach(p => {
-      result[p] = '';
+  const pronouns = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'];
+  const result = {};
+  pronouns.forEach(p => (result[p] = ''));
+
+  // Combine forms into one string
+  let text = forms.join(' ').trim();
+  if (!text) {
+    return pronouns.map(p => ({ pronoun: p, verbForm: '' }));
+  }
+
+  // Normalize apostrophes and spacing
+  text = text.replace(/’/g, "'").replace(/\s+/g, ' ').trim();
+
+  // Fast path: comma-separated items
+  if (text.includes(',')) {
+    const parts = text.split(',').map(p => p.trim()).filter(Boolean);
+    parts.forEach((part) => {
+      const m = part.match(/^((?:j'|je)|tu|il\/elle|nous|vous|ils\/elles)\s+/i);
+      if (!m) return;
+      const keyRaw = m[1].toLowerCase();
+      const key = keyRaw === "j'" ? "je" : keyRaw;
+      const verbForm = part.slice(m[0].length).trim();
+      if (key in result && !result[key]) result[key] = verbForm;
     });
-    
-    // Объединяем все формы в одну строку
-    let text = forms.join(' ').trim();
-    
-    // Пытаемся разбить по запятым если они есть
-    if (text.includes(',')) {
-      const parts = text.split(',').map(p => p.trim()).filter(p => p);
-      
-      parts.forEach((part) => {
-        for (const pronoun of pronouns) {
-          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
-          if (regex.test(part)) {
-            const verbForm = part.replace(regex, '').trim();
-            result[pronoun.toLowerCase()] = verbForm;
-            return;
-          }
-        }
+  } else {
+    // General case: find pronoun tokens with a global regex and slice between them
+    const tokenRe = /(?:^| )((?:j'|je)|tu|il\/elle|nous|vous|ils\/elles)\s+/gi;
+    const matches = [];
+    let mm;
+    while ((mm = tokenRe.exec(text)) !== null) {
+      matches.push({
+        keyRaw: mm[1].toLowerCase(),
+        start: mm.index + (mm[0].startsWith(' ') ? 1 : 0),
+        end: mm.index + mm[0].length,
       });
+    }
+
+    if (matches.length === 0) {
+      result['je'] = text;
     } else {
-      // Если нет запятых, ищем местоимения в тексте последовательно
-      let searchText = text;
-      
-      // Сначала ищем все позиции местоимений
-      const pronounPositions = [];
-      for (const pronoun of pronouns) {
-        const regex = new RegExp(`${pronoun}\\s+`, 'i');
-        const match = regex.exec(searchText);
-        
-        if (match) {
-          pronounPositions.push({
-            pronoun: pronoun.toLowerCase(),
-            index: match.index,
-            endIndex: match.index + match[0].length
-          });
-        }
-      }
-      
-      // Если нет местоимений вообще, добавляем всё как "je"
-      if (pronounPositions.length === 0) {
-        result['je'] = searchText;
-      } else {
-        // Сортируем по позиции
-        pronounPositions.sort((a, b) => a.index - b.index);
-        
-        // Если первый найденный текст не начинается с местоимения, добавляем "je"
-        if (pronounPositions[0].index > 0) {
-          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
-          result['je'] = jeForm;
-        }
-        
-        // Извлекаем формы между местоимениями
-        for (let i = 0; i < pronounPositions.length; i++) {
-          const current = pronounPositions[i];
-          const next = pronounPositions[i + 1];
-          
-          const startIdx = current.endIndex;
-          const endIdx = next ? next.index : searchText.length;
-          const verbForm = searchText.substring(startIdx, endIdx).trim();
-          
-          result[current.pronoun] = verbForm;
-        }
+      for (let i = 0; i < matches.length; i++) {
+        const cur = matches[i];
+        const next = matches[i + 1];
+        const key = cur.keyRaw === "j'" ? "je" : cur.keyRaw;
+        const endIdx = next ? next.start : text.length;
+        const verbForm = text.slice(cur.end, endIdx).trim();
+        if (key in result && !result[key]) result[key] = verbForm;
       }
     }
-    
-    // Преобразуем объект в массив в правильном порядке
-    return pronouns.map(p => ({
-      pronoun: p,
-      verbForm: result[p] || ''
-    }));
-  };
+  }
+
+  return pronouns.map(p => ({ pronoun: p, verbForm: result[p] || '' }));
+};
 
   const parsedForms = parseConjugation();
   const baseWord = word ? word.toLowerCase() : '';
