@@ -1178,6 +1178,9 @@ export default function FrenchFlashCardsApp() {
   const inputRef = useRef(null);
   const topicTitleRef = useRef(null);
 
+  // We use HTML5 drag&drop only on non-touch devices. Touch devices use the long-press pointer implementation.
+  const IS_TOUCH_DEVICE = (typeof window !== 'undefined') && (('ontouchstart' in window) || (navigator?.maxTouchPoints > 0));
+
   // ===== Mobile long-press drag (TOPICS list) =====
   // Keep normal scrolling; start drag only after a short hold.
   const TOPIC_HOLD_MS = 140;
@@ -1954,7 +1957,7 @@ export default function FrenchFlashCardsApp() {
   // Drag and drop для тем на мобильных используя pointer events
   const handleTopicPointerDown = (e, topicId) => {
     // Touch long-press to start dragging topics (keeps normal scrolling)
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
 
     // If user pressed on delete button (or inside it) — don't start drag
     const pressedDelete = e.target && e.target.closest && e.target.closest('button');
@@ -1990,7 +1993,7 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicPointerMove = (e, topicId) => {
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
 
     // If hold hasn't activated yet — cancel drag if user starts scrolling
     if (!topicDragActivatedRef.current) {
@@ -2042,7 +2045,7 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicPointerUp = (e) => {
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
 
     // Always clear hold timer
     if (topicHoldTimeoutRef.current) {
@@ -2107,6 +2110,29 @@ export default function FrenchFlashCardsApp() {
   const handleCardDragOver = (e, cardIndex) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    // Reorder on dragover (same behavior as topics)
+    if (!currentTopic) return;
+    if (draggedCardIndex == null) {
+      setDragOverCardIndex(cardIndex);
+      return;
+    }
+
+    if (draggedCardIndex !== cardIndex) {
+      const newCards = [...currentTopic.cards];
+      const [moved] = newCards.splice(draggedCardIndex, 1);
+      newCards.splice(cardIndex, 0, moved);
+
+      const updatedTopics = topics.map(t =>
+        t.id === currentTopic.id ? { ...t, cards: newCards } : t
+      );
+      updateTopics(updatedTopics);
+      setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
+
+      // Keep dragged index in sync after reorder
+      setDraggedCardIndex(cardIndex);
+    }
+
     setDragOverCardIndex(cardIndex);
   };
 
@@ -2114,35 +2140,19 @@ export default function FrenchFlashCardsApp() {
     setDragOverCardIndex(null);
   };
 
-  const handleCardDrop = (e, targetCardIndex) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Desktop drag-and-drop reordering for word cards list
-    if (!currentTopic) {
-      setDraggedCardIndex(null);
-      setDragOverCardIndex(null);
-      return;
-    }
-
-    if (draggedCardIndex !== null && draggedCardIndex !== targetCardIndex) {
-      const newCards = [...currentTopic.cards];
-      const [draggedCard] = newCards.splice(draggedCardIndex, 1);
-      newCards.splice(targetCardIndex, 0, draggedCard);
-
-      const updatedTopics = topics.map(t =>
-        t.id === currentTopic.id ? { ...t, cards: newCards } : t
-      );
-      updateTopics(updatedTopics);
-      setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
-    }
-    
+  const handleCardDragEnd = (e) => {
+    try {
+      e?.preventDefault?.();
+    } catch (_) {}
     setDraggedCardIndex(null);
     setDragOverCardIndex(null);
   };
 
+  const handleCardDrop = (e, targetCardIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  const handleCardDragEnd = () => {
+    // Reorder is applied on dragover for a smoother experience (like topics).
     setDraggedCardIndex(null);
     setDragOverCardIndex(null);
   };
@@ -2212,7 +2222,7 @@ export default function FrenchFlashCardsApp() {
   }, []);
 
   const handleWordCardPointerDown = (e, cardIndex) => {
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
     if (!currentTopic) return;
     if (!currentTopic.cards || currentTopic.cards.length < 2) return;
 
@@ -2238,7 +2248,7 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleWordCardPointerMove = (e) => {
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
 
     // Before long-press activates, allow scroll and cancel if finger moves (prevents accidental drags)
     if (!isTouchWordCardDragging) {
@@ -2274,7 +2284,7 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleWordCardPointerUp = (e) => {
-    if (e.pointerType !== 'touch') return;
+    if (e.pointerType === 'mouse') return;
 
     // If user released before hold time, cancel drag
     if (wordCardHoldTimeoutRef.current) {
@@ -2535,6 +2545,404 @@ export default function FrenchFlashCardsApp() {
     }
   };
 
+
+  // ===== Global Modals (used on both Home and Topic screens) =====
+  const renderGlobalModals = () => (
+    <>
+      {showApiKeyModal && (
+        <div className="celebration-modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div className="celebration-modal-content api-key-modal-content" style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '32px',
+            boxSizing: 'border-box',
+            minHeight: '600px',
+          }}>
+            {/* API Key Icon */}
+            <div style={{ marginBottom: '32px', fontSize: '80px' }}>
+              🔑
+            </div>
+
+            {/* Title */}
+            <h1 className="celebration-modal-title" style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '30px',
+              fontWeight: '500',
+              lineHeight: '38px',
+              letterSpacing: '0',
+              marginBottom: '12px',
+              color: '#000000',
+              textAlign: 'center',
+            }}>
+              Gemini API Key
+            </h1>
+
+            {/* Subtitle */}
+            <p style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '16px',
+              fontWeight: '400',
+              lineHeight: '26px',
+              color: 'rgba(0, 0, 0, 0.6)',
+              marginBottom: '24px',
+            }}>
+              This app needs a Gemini API Key to translate and analyze.
+            </p>
+
+            {/* API Key Input + Error Wrapper */}
+            <div style={{
+              marginBottom: '32px',
+              width: '100%',
+            }}>
+              {/* Input + Error Container */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}>
+                {/* Input Row */}
+                <div className="api-key-input-wrapper" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}>
+                  {/* Icon */}
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    marginTop: '12px',
+                  }}>
+                    <svg width="26" height="26" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm-40-280h80v-240h-80v240Zm0 120h80v-80h-80v80Z"/>
+                    </svg>
+                  </div>
+
+                  {/* Input */}
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      gap: '12px',
+                      alignItems: 'center',
+                    }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={tempApiKey}
+                        onChange={(e) => {
+                          setTempApiKey(e.target.value);
+                          if (apiKeyError) setApiKeyError('');
+                        }}
+                        placeholder="Enter Gemini API Key"
+                        className="uniform-input"
+                        style={{
+                          flex: 1,
+                          borderRadius: '12px',
+                        }}
+                      />
+                      <button
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          backgroundColor: 'rgba(0, 0, 0, 0.07)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                        title={showPassword ? 'Hide' : 'Show'}
+                      >
+                        {showPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+
+                    {/* Error message */}
+                    {apiKeyError && (
+                      <div style={{
+                        fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        lineHeight: '20px',
+                        color: '#DC2626',
+                        textAlign: 'left',
+                      }}>
+                        {apiKeyError}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              width: '100%',
+              marginTop: 'auto',
+            }}>
+              {/* Save Button */}
+              <button
+                onClick={() => {
+                  const error = validateApiKey(tempApiKey);
+                  if (error) {
+                    setApiKeyError(error);
+                  } else {
+                    localStorage.setItem('gemini_api_key', tempApiKey);
+                    setApiKey(tempApiKey);
+                    setShowApiKeyModal(false);
+                    setApiKeyError('');
+                    setTempApiKey('');
+                    setShowPassword(false);
+                    hideKeyboard();
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  lineHeight: '24px',
+                  cursor: 'pointer',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
+              >
+                Save this key
+              </button>
+
+              {/* Cancel Button */}
+              <button
+                onClick={() => {
+                  setShowApiKeyModal(false);
+                  setTempApiKey('');
+                  setApiKeyError('');
+                  setShowPassword(false);
+                  hideKeyboard();
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.07)',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '0 16px',
+          boxSizing: 'border-box',
+        }}>
+          <div className="celebration-modal-content" style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '24px',
+            textAlign: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '32px',
+            boxSizing: 'border-box',
+            minHeight: '600px',
+          }}>
+            {/* Icon */}
+            <div style={{ marginBottom: '32px', fontSize: '80px' }}>
+              👤
+            </div>
+
+            {/* Title */}
+            <h1 style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '30px',
+              fontWeight: '500',
+              lineHeight: '38px',
+              letterSpacing: '0',
+              marginBottom: '12px',
+              color: '#000000',
+              textAlign: 'center',
+            }}>
+              Welcome
+            </h1>
+
+            {/* Subtitle */}
+            <p style={{
+              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '16px',
+              fontWeight: '400',
+              lineHeight: '26px',
+              color: 'rgba(0, 0, 0, 0.6)',
+              marginBottom: '24px',
+            }}>
+              Sign in to your account
+            </p>
+
+            {/* Input with Icon */}
+            <div style={{
+              marginBottom: '32px',
+              width: '100%',
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'flex-start',
+              }}>
+                {/* Icon */}
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginTop: '12px',
+                }}>
+                  <svg width="26" height="26" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/>
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={loginUserId}
+                  onChange={(e) => setLoginUserId(e.target.value)}
+                  placeholder="Enter your user ID"
+                  className="uniform-input"
+                  style={{
+                    flex: 1,
+                    borderRadius: '12px',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              width: '100%',
+              marginTop: 'auto',
+            }}>
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  // (логин-логика остаётся как была — здесь просто закрываем)
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: '#000000',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  lineHeight: '24px',
+                  cursor: 'pointer',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
+              >
+                Sign In
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowLoginModal(false);
+                  setLoginUserId('');
+                }}
+                style={{
+                  width: '100%',
+                  height: '56px',
+                  padding: '0 20px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.07)',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   // Главная страница - список тем
   if (!currentTopic) {
 
@@ -2709,7 +3117,7 @@ export default function FrenchFlashCardsApp() {
                     <div
                       key={topic.id}
                       data-topic-id={topic.id}
-                      draggable
+                      draggable={!IS_TOUCH_DEVICE}
                       onDragStart={(e) => {
                         handleTopicDragStart(e, topic.id);
                       }}
@@ -2871,490 +3279,7 @@ export default function FrenchFlashCardsApp() {
 
             </div>
 
-      {showApiKeyModal && (
-        <div className="celebration-modal-overlay" style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}>
-          <div className="celebration-modal-content" style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '24px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '32px',
-            boxSizing: 'border-box',
-            minHeight: '600px',
-          }}>
-            {/* API Key Icon */}
-            <div style={{ marginBottom: '32px', fontSize: '80px' }}>
-              🔑
-            </div>
-
-            {/* Title */}
-            <h1 className="celebration-modal-title" style={{
-              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              fontSize: '30px',
-              fontWeight: '500',
-              lineHeight: '38px',
-              letterSpacing: '0',
-              marginBottom: '12px',
-              color: '#000000',
-              textAlign: 'center',
-            }}>
-              Gemini API Key
-            </h1>
-
-            {/* Subtitle */}
-            <p style={{
-              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              fontSize: '16px',
-              fontWeight: '400',
-              lineHeight: '26px',
-              color: 'rgba(0, 0, 0, 0.6)',
-              marginBottom: '24px',
-            }}>
-              This app needs a Gemini API Key to translate and analyze.
-            </p>
-
-            {/* API Key Input + Error Wrapper */}
-            <div style={{
-              marginBottom: '32px',
-              width: '100%',
-            }}>
-              {/* Input + Error Container */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-              }}>
-                {/* Input Row */}
-                <div className="api-key-input-wrapper" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                }}>
-                  {/* Icon */}
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}>
-                    <svg width="24" height="24" viewBox="0 -960 960 960" fill="#000000">
-                      <path d="M280-400q-33 0-56.5-23.5T200-480q0-33 23.5-56.5T280-560q33 0 56.5 23.5T360-480q0 33-23.5 56.5T280-400Zm0 160q-100 0-170-70T40-480q0-100 70-170t170-70q67 0 121.5 33t86.5 87h352l120 120-180 180-80-60-80 60-85-60h-47q-32 54-86.5 87T280-240Zm0-80q56 0 98.5-34t56.5-86h125l58 41 82-61 71 55 75-75-40-40H435q-14-52-56.5-86T280-640q-66 0-113 47t-47 113q0 66 47 113t113 47Z"/>
-                    </svg>
-                  </div>
-                  
-                  {/* Input Container */}
-                  <div style={{
-                    flex: 1,
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
-                    {/* Input */}
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={tempApiKey}
-                      onChange={(e) => {
-                        setTempApiKey(e.target.value);
-                        setApiKeyError(''); // Очищаем ошибку при вводе
-                      }}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          const error = validateApiKey(tempApiKey);
-                          if (!error) {
-                            localStorage.setItem('gemini_api_key', tempApiKey);
-                            setApiKey(tempApiKey);
-                            setShowApiKeyModal(false);
-                            setApiKeyError('');
-                            setTempApiKey('');
-                            setShowPassword(false);
-                          } else {
-                            setApiKeyError(error);
-                          }
-                        }
-                      }}
-                      placeholder="Starts with Alza"
-                      style={{
-                        width: '100%',
-                        height: '56px',
-                        padding: '0 50px 0 20px',
-                        border: apiKeyError ? '1.5px solid #DC2626' : '1.5px solid rgba(0, 0, 0, 0.12)',
-                        boxSizing: 'border-box',
-                        fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                        fontSize: '16px',
-                        fontWeight: '500',
-                        lineHeight: '24px',
-                        borderRadius: '12px',
-                        backgroundColor: '#ffffff',
-                        color: '#000000',
-                        colorScheme: 'light',
-                        outline: 'none',
-                      }}
-                    />
-                    
-                    {/* Show/Hide Password Button - Inside Input */}
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        width: '32px',
-                        height: '32px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0,
-                        transition: 'opacity 0.2s ease',
-                      }}
-                      onMouseEnter={(e) => e.target.style.opacity = '0.6'}
-                      onMouseLeave={(e) => e.target.style.opacity = '1'}
-                    >
-                      {showPassword ? (
-                        // Eye icon (show password)
-                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
-                          <path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/>
-                        </svg>
-                      ) : (
-                        // Eye off icon (hide password)
-                        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#000000">
-                          <path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/>
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Error message */}
-                {apiKeyError && (
-                  <div style={{
-                    fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    lineHeight: '20px',
-                    color: '#DC2626',
-                    textAlign: 'left',
-                  }}>
-                    {apiKeyError}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              width: '100%',
-              marginTop: 'auto',
-            }}>
-              {/* Save Button */}
-              <button
-                onClick={() => {
-                  const error = validateApiKey(tempApiKey);
-                  if (error) {
-                    setApiKeyError(error);
-                  } else {
-                    localStorage.setItem('gemini_api_key', tempApiKey);
-                    setApiKey(tempApiKey);
-                    setShowApiKeyModal(false);
-                    setApiKeyError('');
-                    setTempApiKey('');
-                    setShowPassword(false);
-                    hideKeyboard();
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  height: '56px',
-                  padding: '0 20px',
-                  backgroundColor: '#000000',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  lineHeight: '24px',
-                  cursor: 'pointer',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                  transition: 'background-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#333333'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#000000'}
-              >
-                Save this key
-              </button>
-
-              {/* Cancel Button */}
-              <button
-                onClick={() => {
-                  setShowApiKeyModal(false);
-                  setTempApiKey('');
-                  setApiKeyError('');
-                  setShowPassword(false);
-                  hideKeyboard();
-                }}
-                style={{
-                  width: '100%',
-                  height: '56px',
-                  padding: '0 20px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.07)',
-                  color: '#000000',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  lineHeight: '24px',
-                  cursor: 'pointer',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                  transition: 'background-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '0 16px',
-          boxSizing: 'border-box',
-        }}>
-          <div className="celebration-modal-content" style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '24px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '32px',
-            boxSizing: 'border-box',
-            minHeight: '600px',
-          }}>
-            {/* Icon */}
-            <div style={{ marginBottom: '32px', fontSize: '80px' }}>
-              👤
-            </div>
-
-            {/* Title */}
-            <h1 style={{
-              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              fontSize: '30px',
-              fontWeight: '500',
-              lineHeight: '38px',
-              letterSpacing: '0',
-              marginBottom: '12px',
-              color: '#000000',
-              textAlign: 'center',
-            }}>
-              Welcome
-            </h1>
-
-            {/* Subtitle */}
-            <p style={{
-              fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              fontSize: '16px',
-              fontWeight: '400',
-              lineHeight: '26px',
-              color: 'rgba(0, 0, 0, 0.6)',
-              marginBottom: '24px',
-            }}>
-              Sign in to your account
-            </p>
-
-            {/* Input with Icon */}
-            <div style={{
-              marginBottom: '32px',
-              width: '100%',
-            }}>
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                alignItems: 'flex-start',
-              }}>
-                {/* Icon */}
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  marginTop: '12px',
-                }}>
-                  <svg width="26" height="26" viewBox="0 -960 960 960" fill="#000000" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/>
-                  </svg>
-                </div>
-
-                {/* Input Wrapper */}
-                <div style={{
-                  flex: 1,
-                  position: 'relative',
-                }}>
-                  <input
-                    type="text"
-                    value={loginUserId}
-                    onChange={(e) => setLoginUserId(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && loginUserId.trim()) {
-                        setShowLoginModal(false);
-                        setLoginUserId('');
-                      }
-                    }}
-                    placeholder="Enter your username"
-                    maxLength="50"
-                    style={{
-                      width: '100%',
-                      height: '56px',
-                      padding: '0 20px',
-                      border: '1.5px solid rgba(0, 0, 0, 0.12)',
-                      borderRadius: '12px',
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                      lineHeight: '24px',
-                      letterSpacing: '0%',
-                      color: '#000000',
-                      backgroundColor: '#ffffff',
-                      colorScheme: 'light',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-
-                  {/* Char count */}
-                  <div style={{
-                    position: 'absolute',
-                    right: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontSize: '14px',
-                    lineHeight: '14px',
-                    color: 'rgba(0, 0, 0, 0.4)',
-                    backgroundColor: '#F5F5F5',
-                    padding: '6px',
-                    borderRadius: '6px',
-                  }}>
-                    {loginUserId.length}/50
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Buttons Wrapper */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px',
-              width: '100%',
-              marginTop: 'auto',
-            }}>
-              {/* Sign In Button */}
-              <button
-                onClick={() => {
-                  if (loginUserId.trim()) {
-                    setShowLoginModal(false);
-                    setLoginUserId('');
-                    addSuccess(`Welcome, ${loginUserId}!`);
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  height: '56px',
-                  padding: '0 20px',
-                  backgroundColor: loginUserId.trim() ? '#000000' : 'rgba(0, 0, 0, 0.05)',
-                  color: loginUserId.trim() ? '#ffffff' : 'rgba(0, 0, 0, 0.3)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                  cursor: loginUserId.trim() ? 'pointer' : 'default',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  if (loginUserId.trim()) {
-                    e.target.style.backgroundColor = '#333333';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (loginUserId.trim()) {
-                    e.target.style.backgroundColor = '#000000';
-                  }
-                }}
-              >
-                Sign In
-              </button>
-
-              {/* Cancel Button */}
-              <button
-                onClick={() => {
-                  setShowLoginModal(false);
-                  setLoginUserId('');
-                }}
-                style={{
-                  width: '100%',
-                  height: '56px',
-                  padding: '0 20px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.07)',
-                  color: '#000000',
-                  border: 'none',
-                  borderRadius: '12px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  fontFamily: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.12)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.07)'}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderGlobalModals()}
       </div>
     </div>
     );
@@ -3396,6 +3321,8 @@ export default function FrenchFlashCardsApp() {
           animation: slideUp 0.3s ease-out;
         }
       `}</style>
+
+      {renderGlobalModals()}
 
       {/* Celebration Modal */}
       {showCelebrationModal && (
@@ -4329,7 +4256,7 @@ export default function FrenchFlashCardsApp() {
                   <div
                     key={idx}
                     data-word-card-index={idx}
-                    draggable
+                    draggable={!IS_TOUCH_DEVICE}
                     onDragStart={(e) => handleCardDragStart(e, idx)}
                     onDragOver={(e) => handleCardDragOver(e, idx)}
                     onDragLeave={handleCardDragLeave}
@@ -4340,7 +4267,7 @@ export default function FrenchFlashCardsApp() {
                     onPointerUp={handleWordCardPointerUp}
                     onPointerCancel={handleWordCardPointerUp}
                     style={{
-                      border: (isTouchWordCardDragging && touchDraggedWordCardIndex === idx)
+                      border: ((isTouchWordCardDragging && touchDraggedWordCardIndex === idx) || draggedCardIndex === idx)
                         ? '2px dashed rgba(0, 0, 0, 0.3)'
                         : '1.5px solid rgba(0, 0, 0, 0.08)',
                       boxSizing: 'border-box',
@@ -4349,15 +4276,15 @@ export default function FrenchFlashCardsApp() {
                       padding: '0.9rem',
                       userSelect: 'none',
                       WebkitUserSelect: 'none',
-                      // Allow normal vertical scroll, but once long-press drag is active
-                      // we must disable browser scroll handling (iOS Safari otherwise eats the gesture).
-                      touchAction: isTouchWordCardDragging ? 'none' : 'pan-y',
-                      backgroundColor: (isTouchWordCardDragging && touchDragOverWordCardIndex === idx)
+                      touchAction: (isTouchWordCardDragging || draggedCardIndex != null) ? 'none' : 'pan-y',
+                      backgroundColor: ((dragOverCardIndex === idx) || (isTouchWordCardDragging && touchDragOverWordCardIndex === idx))
                         ? 'rgba(0, 0, 0, 0.06)'
                         : 'transparent',
-                      opacity: (isTouchWordCardDragging && touchDraggedWordCardIndex === idx) ? 0.6 : 1,
+                      opacity: ((isTouchWordCardDragging && touchDraggedWordCardIndex === idx) || draggedCardIndex === idx) ? 0.6 : 1,
+                      pointerEvents: 'auto',
+                      transition: 'all 0.15s ease',
                     }}
-                    className="flex items-center gap-4 cursor-pointer hover:bg-black/2 transition"
+                    className="topic-item flex items-center gap-4 cursor-pointer hover:bg-black/2"
                   >
                     {/* Left icon */}
                     <svg 
