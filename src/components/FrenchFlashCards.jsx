@@ -59,22 +59,7 @@ if (typeof document !== 'undefined') {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Allow normal vertical scrolling; we enable drag after long-press */
-      touch-action: pan-y;
-    }
-
-    .topic-item.dragging {
-      /* During active reordering we fully take over the gesture */
-      touch-action: none;
-    }
-
-    /* Inner elements should not block scrolling by default */
-    .topic-item * {
-      touch-action: pan-y;
-    }
-
-    .topic-item.dragging * {
-      touch-action: none;
+      touch-action: manipulation;
     }
     
     .back-button-sidebar, .export-button-sidebar, .import-button-sidebar {
@@ -708,63 +693,66 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-
-    const original = verbForm.trim();
-    const base = (baseWord || '').trim();
-
-    // Reflexive/particle prefixes in conjugated forms (me, m', te, t', se, s', nous, vous)
-    // Examples: "me lave", "m'appelle", "Te laves", "nous lavons", "s'habille"
-    const prefixMatch = original.match(/^(me\s+|m'|te\s+|t'|se\s+|s'|nous\s+|vous\s+)/i);
-    const prefix = prefixMatch ? prefixMatch[0] : '';
-    const verbWithoutPrefix = original.slice(prefix.length).trim();
-
-    // Remove reflexive prefix from infinitive/base (se / s')
-    let baseWithoutPrefix = base;
-    if (/^se\s+/i.test(baseWithoutPrefix)) {
-      baseWithoutPrefix = baseWithoutPrefix.replace(/^se\s+/i, '').trim();
-    } else if (/^s'/i.test(baseWithoutPrefix)) {
-      baseWithoutPrefix = baseWithoutPrefix.replace(/^s'/i, '').trim();
+    
+    const cleanVerb = verbForm.trim();
+    let cleanBase = baseWord.trim();
+    
+    // Убираем возвратный префикс для сравнения
+    if (cleanBase.toLowerCase().startsWith('se ')) {
+      cleanBase = cleanBase.substring(3).trim();
+    } else if (cleanBase.toLowerCase().startsWith("s'")) {
+      cleanBase = cleanBase.substring(2).trim();
     }
-
-    const stripInfinitiveEnding = (w) => {
-      const lower = w.toLowerCase();
-      if (lower.endsWith('er')) return w.slice(0, -2);
-      if (lower.endsWith('ir')) return w.slice(0, -2);
-      if (lower.endsWith('re')) return w.slice(0, -2);
-      if (lower.endsWith('oir')) return w.slice(0, -3);
-      return w;
-    };
-
-    const baseRoot = stripInfinitiveEnding(baseWithoutPrefix).toLowerCase();
-    const compare = verbWithoutPrefix;
-    const compareLower = compare.toLowerCase();
-
-    // Find common prefix length (root)
+    
+    // Убираем возвратный префикс из формы если есть
+    let baseForComparison = cleanVerb;
+    if (cleanVerb.toLowerCase().startsWith('se ')) {
+      baseForComparison = cleanVerb.substring(3).trim();
+    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
+      baseForComparison = cleanVerb.substring(2).trim();
+    }
+    
+    // Пытаемся убрать окончания инфинитива для лучшего сравнения
+    let baseForMatching = cleanBase.toLowerCase();
+    
+    // Убираем типичные французские окончания инфинитива
+    if (baseForMatching.endsWith('er')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('ir')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('re')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('oir')) {
+      baseForMatching = baseForMatching.slice(0, -3);
+    }
+    
+    // Находим где кончается корень
     let commonLength = 0;
-    const minLength = Math.min(baseRoot.length, compareLower.length);
-
+    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
+    
     for (let i = 0; i < minLength; i++) {
-      if (baseRoot[i] === compareLower[i]) {
+      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-
-    // Too little match -> don't highlight (avoid false positives)
-    if (commonLength < 2) {
-      return original;
+    
+    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
+    if (commonLength < 3) {
+      return cleanVerb;
     }
-
-    // If there's no ending, return as-is
-    if (commonLength >= compare.length) {
-      return `${prefix}${compare}`;
+    
+    if (commonLength > 0 && commonLength < baseForComparison.length) {
+      const root = baseForComparison.substring(0, commonLength);
+      const ending = baseForComparison.substring(commonLength);
+      
+      // Восстанавливаем префикс если был
+      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
+      return `${prefix}${root}<b>${ending}</b>`;
     }
-
-    const root = compare.substring(0, commonLength);
-    const ending = compare.substring(commonLength);
-
-    return `${prefix}${root}<b>${ending}</b>`;
+    
+    return cleanVerb;
   };
 
   const parseConjugation = () => {
@@ -777,53 +765,64 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
     });
     
     // Объединяем все формы в одну строку
-    // Важно: Gemini часто возвращает варианты местоимений: j', il, elle, ils, elles, il/elle, ils/elles
-    // и иногда без запятых/переносов. Поэтому делаем более устойчивый парсер.
     let text = forms.join(' ').trim();
     
-    // Нормализуем апострофы (j’ -> j')
-    text = text.replace(/[’`]/g, "'");
-
-    // Превращаем разные варианты местоимений в канонические маркеры
-    // Используем границу (начало/пробел/запятая/точка с запятой/перенос)
-    const toMarkers = (t) => {
-      let s = ` ${t} `;
-      s = s.replace(/(^|[\s,;\n])j\s*'/gi, '$1||je|| ');
-      s = s.replace(/(^|[\s,;\n])je\b/gi, '$1||je|| ');
-      s = s.replace(/(^|[\s,;\n])tu\b/gi, '$1||tu|| ');
-      s = s.replace(/(^|[\s,;\n])il\s*\/\s*elle\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])il\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])elle\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])nous\b/gi, '$1||nous|| ');
-      s = s.replace(/(^|[\s,;\n])vous\b/gi, '$1||vous|| ');
-      s = s.replace(/(^|[\s,;\n])ils\s*\/\s*elles\b/gi, '$1||ils/elles|| ');
-      s = s.replace(/(^|[\s,;\n])ils\b/gi, '$1||ils/elles|| ');
-      s = s.replace(/(^|[\s,;\n])elles\b/gi, '$1||ils/elles|| ');
-      return s;
-    };
-
-    const marked = toMarkers(text);
-    const markerRe = /\|\|(je|tu|il\/elle|nous|vous|ils\/elles)\|\|/g;
-    const matches = Array.from(marked.matchAll(markerRe));
-
-    if (matches.length === 0) {
-      // Если не нашли вообще местоимений, кладём весь текст в je
-      result.je = text;
+    // Пытаемся разбить по запятым если они есть
+    if (text.includes(',')) {
+      const parts = text.split(',').map(p => p.trim()).filter(p => p);
+      
+      parts.forEach((part) => {
+        for (const pronoun of pronouns) {
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          if (regex.test(part)) {
+            const verbForm = part.replace(regex, '').trim();
+            result[pronoun.toLowerCase()] = verbForm;
+            return;
+          }
+        }
+      });
     } else {
-      for (let i = 0; i < matches.length; i++) {
-        const key = matches[i][1];
-        const start = matches[i].index + matches[i][0].length;
-        const end = (i + 1 < matches.length) ? matches[i + 1].index : marked.length;
-        let formText = marked.slice(start, end).trim();
-
-        // Чистим возможные разделители
-        formText = formText.replace(/^[:\-–—]+\s*/, '');
-        formText = formText.replace(/^[,;]+\s*/, '');
-        formText = formText.replace(/[\s,;]+$/g, '');
-
-        if (formText) {
-          // Не перезаписываем уже заполненное (если, например, Gemini повторил местоимение)
-          if (!result[key]) result[key] = formText;
+      // Если нет запятых, ищем местоимения в тексте последовательно
+      let searchText = text;
+      
+      // Сначала ищем все позиции местоимений
+      const pronounPositions = [];
+      for (const pronoun of pronouns) {
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
+        const match = regex.exec(searchText);
+        
+        if (match) {
+          pronounPositions.push({
+            pronoun: pronoun.toLowerCase(),
+            index: match.index,
+            endIndex: match.index + match[0].length
+          });
+        }
+      }
+      
+      // Если нет местоимений вообще, добавляем всё как "je"
+      if (pronounPositions.length === 0) {
+        result['je'] = searchText;
+      } else {
+        // Сортируем по позиции
+        pronounPositions.sort((a, b) => a.index - b.index);
+        
+        // Если первый найденный текст не начинается с местоимения, добавляем "je"
+        if (pronounPositions[0].index > 0) {
+          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
+          result['je'] = jeForm;
+        }
+        
+        // Извлекаем формы между местоимениями
+        for (let i = 0; i < pronounPositions.length; i++) {
+          const current = pronounPositions[i];
+          const next = pronounPositions[i + 1];
+          
+          const startIdx = current.endIndex;
+          const endIdx = next ? next.index : searchText.length;
+          const verbForm = searchText.substring(startIdx, endIdx).trim();
+          
+          result[current.pronoun] = verbForm;
         }
       }
     }
@@ -905,63 +904,66 @@ const ConjugationTable = ({ conjugation, word }) => {
   // Функция для выделения окончания
   const highlightEnding = (verbForm, baseWord) => {
     if (!baseWord || !verbForm) return verbForm;
-
-    const original = verbForm.trim();
-    const base = (baseWord || '').trim();
-
-    // Reflexive/particle prefixes in conjugated forms (me, m', te, t', se, s', nous, vous)
-    // Examples: "me lave", "m'appelle", "Te laves", "nous lavons", "s'habille"
-    const prefixMatch = original.match(/^(me\s+|m'|te\s+|t'|se\s+|s'|nous\s+|vous\s+)/i);
-    const prefix = prefixMatch ? prefixMatch[0] : '';
-    const verbWithoutPrefix = original.slice(prefix.length).trim();
-
-    // Remove reflexive prefix from infinitive/base (se / s')
-    let baseWithoutPrefix = base;
-    if (/^se\s+/i.test(baseWithoutPrefix)) {
-      baseWithoutPrefix = baseWithoutPrefix.replace(/^se\s+/i, '').trim();
-    } else if (/^s'/i.test(baseWithoutPrefix)) {
-      baseWithoutPrefix = baseWithoutPrefix.replace(/^s'/i, '').trim();
+    
+    const cleanVerb = verbForm.trim();
+    let cleanBase = baseWord.trim();
+    
+    // Убираем возвратный префикс для сравнения
+    if (cleanBase.toLowerCase().startsWith('se ')) {
+      cleanBase = cleanBase.substring(3).trim();
+    } else if (cleanBase.toLowerCase().startsWith("s'")) {
+      cleanBase = cleanBase.substring(2).trim();
     }
-
-    const stripInfinitiveEnding = (w) => {
-      const lower = w.toLowerCase();
-      if (lower.endsWith('er')) return w.slice(0, -2);
-      if (lower.endsWith('ir')) return w.slice(0, -2);
-      if (lower.endsWith('re')) return w.slice(0, -2);
-      if (lower.endsWith('oir')) return w.slice(0, -3);
-      return w;
-    };
-
-    const baseRoot = stripInfinitiveEnding(baseWithoutPrefix).toLowerCase();
-    const compare = verbWithoutPrefix;
-    const compareLower = compare.toLowerCase();
-
-    // Find common prefix length (root)
+    
+    // Убираем возвратный префикс из формы если есть
+    let baseForComparison = cleanVerb;
+    if (cleanVerb.toLowerCase().startsWith('se ')) {
+      baseForComparison = cleanVerb.substring(3).trim();
+    } else if (cleanVerb.toLowerCase().startsWith("s'")) {
+      baseForComparison = cleanVerb.substring(2).trim();
+    }
+    
+    // Пытаемся убрать окончания инфинитива для лучшего сравнения
+    let baseForMatching = cleanBase.toLowerCase();
+    
+    // Убираем типичные французские окончания инфинитива
+    if (baseForMatching.endsWith('er')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('ir')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('re')) {
+      baseForMatching = baseForMatching.slice(0, -2);
+    } else if (baseForMatching.endsWith('oir')) {
+      baseForMatching = baseForMatching.slice(0, -3);
+    }
+    
+    // Находим где кончается корень
     let commonLength = 0;
-    const minLength = Math.min(baseRoot.length, compareLower.length);
-
+    const minLength = Math.min(baseForMatching.length, baseForComparison.toLowerCase().length);
+    
     for (let i = 0; i < minLength; i++) {
-      if (baseRoot[i] === compareLower[i]) {
+      if (baseForMatching[i] === baseForComparison.toLowerCase()[i]) {
         commonLength = i + 1;
       } else {
         break;
       }
     }
-
-    // Too little match -> don't highlight (avoid false positives)
-    if (commonLength < 2) {
-      return original;
+    
+    // Если совпадение слишком малое (менее 3 символов), показываем всё слово без выделения
+    if (commonLength < 3) {
+      return cleanVerb;
     }
-
-    // If there's no ending, return as-is
-    if (commonLength >= compare.length) {
-      return `${prefix}${compare}`;
+    
+    if (commonLength > 0 && commonLength < baseForComparison.length) {
+      const root = baseForComparison.substring(0, commonLength);
+      const ending = baseForComparison.substring(commonLength);
+      
+      // Восстанавливаем префикс если был
+      const prefix = cleanVerb.substring(0, cleanVerb.length - baseForComparison.length);
+      return `${prefix}${root}<b>${ending}</b>`;
     }
-
-    const root = compare.substring(0, commonLength);
-    const ending = compare.substring(commonLength);
-
-    return `${prefix}${root}<b>${ending}</b>`;
+    
+    return cleanVerb;
   };
 
   const parseConjugation = () => {
@@ -974,53 +976,64 @@ const ConjugationTable = ({ conjugation, word }) => {
     });
     
     // Объединяем все формы в одну строку
-    // Важно: Gemini часто возвращает варианты местоимений: j', il, elle, ils, elles, il/elle, ils/elles
-    // и иногда без запятых/переносов. Поэтому делаем более устойчивый парсер.
     let text = forms.join(' ').trim();
-
-    // Нормализуем апострофы (j’ -> j')
-    text = text.replace(/[’`]/g, "'");
-
-    // Превращаем разные варианты местоимений в канонические маркеры
-    // Используем границу (начало/пробел/запятая/точка с запятой/перенос)
-    const toMarkers = (t) => {
-      let s = ` ${t} `;
-      s = s.replace(/(^|[\s,;\n])j\s*'/gi, '$1||je|| ');
-      s = s.replace(/(^|[\s,;\n])je\b/gi, '$1||je|| ');
-      s = s.replace(/(^|[\s,;\n])tu\b/gi, '$1||tu|| ');
-      s = s.replace(/(^|[\s,;\n])il\s*\/\s*elle\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])il\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])elle\b/gi, '$1||il/elle|| ');
-      s = s.replace(/(^|[\s,;\n])nous\b/gi, '$1||nous|| ');
-      s = s.replace(/(^|[\s,;\n])vous\b/gi, '$1||vous|| ');
-      s = s.replace(/(^|[\s,;\n])ils\s*\/\s*elles\b/gi, '$1||ils/elles|| ');
-      s = s.replace(/(^|[\s,;\n])ils\b/gi, '$1||ils/elles|| ');
-      s = s.replace(/(^|[\s,;\n])elles\b/gi, '$1||ils/elles|| ');
-      return s;
-    };
-
-    const marked = toMarkers(text);
-    const markerRe = /\|\|(je|tu|il\/elle|nous|vous|ils\/elles)\|\|/g;
-    const matches = Array.from(marked.matchAll(markerRe));
-
-    if (matches.length === 0) {
-      // Если не нашли вообще местоимений, кладём весь текст в je
-      result.je = text;
+    
+    // Пытаемся разбить по запятым если они есть
+    if (text.includes(',')) {
+      const parts = text.split(',').map(p => p.trim()).filter(p => p);
+      
+      parts.forEach((part) => {
+        for (const pronoun of pronouns) {
+          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
+          if (regex.test(part)) {
+            const verbForm = part.replace(regex, '').trim();
+            result[pronoun.toLowerCase()] = verbForm;
+            return;
+          }
+        }
+      });
     } else {
-      for (let i = 0; i < matches.length; i++) {
-        const key = matches[i][1];
-        const start = matches[i].index + matches[i][0].length;
-        const end = (i + 1 < matches.length) ? matches[i + 1].index : marked.length;
-        let formText = marked.slice(start, end).trim();
-
-        // Чистим возможные разделители
-        formText = formText.replace(/^[:\-–—]+\s*/, '');
-        formText = formText.replace(/^[,;]+\s*/, '');
-        formText = formText.replace(/[\s,;]+$/g, '');
-
-        if (formText) {
-          // Не перезаписываем уже заполненное (если, например, Gemini повторил местоимение)
-          if (!result[key]) result[key] = formText;
+      // Если нет запятых, ищем местоимения в тексте последовательно
+      let searchText = text;
+      
+      // Сначала ищем все позиции местоимений
+      const pronounPositions = [];
+      for (const pronoun of pronouns) {
+        const regex = new RegExp(`${pronoun}\\s+`, 'i');
+        const match = regex.exec(searchText);
+        
+        if (match) {
+          pronounPositions.push({
+            pronoun: pronoun.toLowerCase(),
+            index: match.index,
+            endIndex: match.index + match[0].length
+          });
+        }
+      }
+      
+      // Если нет местоимений вообще, добавляем всё как "je"
+      if (pronounPositions.length === 0) {
+        result['je'] = searchText;
+      } else {
+        // Сортируем по позиции
+        pronounPositions.sort((a, b) => a.index - b.index);
+        
+        // Если первый найденный текст не начинается с местоимения, добавляем "je"
+        if (pronounPositions[0].index > 0) {
+          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
+          result['je'] = jeForm;
+        }
+        
+        // Извлекаем формы между местоимениями
+        for (let i = 0; i < pronounPositions.length; i++) {
+          const current = pronounPositions[i];
+          const next = pronounPositions[i + 1];
+          
+          const startIdx = current.endIndex;
+          const endIdx = next ? next.index : searchText.length;
+          const verbForm = searchText.substring(startIdx, endIdx).trim();
+          
+          result[current.pronoun] = verbForm;
         }
       }
     }
@@ -1067,6 +1080,10 @@ export default function FrenchFlashCardsApp() {
   const CARD_WIDTH = 614;  // Ширина контейнера слайдера
   const CARD_GAP = 16;     // Gap между карточками
   const SLIDE_WIDTH = CARD_WIDTH + CARD_GAP;  // 630px - полная ширина одного слайда
+
+  // Persist / restore last screen (home vs topic)
+  const VIEW_STATE_KEY = "french_view_state_v1";
+  const didRestoreViewStateRef = useRef(false);
   
   const [topics, setTopics] = useState([]);
   const [currentTopic, setCurrentTopic] = useState(null);
@@ -1100,13 +1117,6 @@ export default function FrenchFlashCardsApp() {
   const [touchDragOverTopicId, setTouchDragOverTopicId] = useState(null);
   const [pointerDownTopic, setPointerDownTopic] = useState(null);
   const [pointerDownTime, setPointerDownTime] = useState(null);
-  const [suppressTopicClick, setSuppressTopicClick] = useState(false);
-
-  // Mobile long-press drag for WORD CARDS list
-  const [pointerDownWordCardIndex, setPointerDownWordCardIndex] = useState(null);
-  const [pointerDownWordCardTime, setPointerDownWordCardTime] = useState(null);
-  const [touchDragWordCardIndex, setTouchDragWordCardIndex] = useState(null);
-  const [touchDragOverWordCardIndex, setTouchDragOverWordCardIndex] = useState(null);
   const [editablePartOfSpeech, setEditablePartOfSpeech] = useState('');
   const [editableTypeOfWord, setEditableTypeOfWord] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -1155,37 +1165,6 @@ export default function FrenchFlashCardsApp() {
   
   const inputRef = useRef(null);
   const topicTitleRef = useRef(null);
-  // Used to temporarily disable page scrolling while reordering topics on mobile
-  const topicDragScrollLockRef = useRef({
-    bodyOverflow: '',
-    bodyTouchAction: '',
-    htmlTouchAction: ''
-  });
-
-  // Long-press drag support for mobile topic reordering (keeps normal scrolling)
-  const topicPointerStartRef = useRef({ x: 0, y: 0 });
-  const TOPIC_LONG_PRESS_MS = 260;
-  const TOPIC_CANCEL_MOVE_PX = 10;
-  const TOPIC_START_DRAG_MOVE_PX = 2;
-
-  // Mobile long-press drag support for WORD CARDS list (keeps normal scrolling)
-  const wordCardDragScrollLockRef = useRef({
-    bodyOverflow: '',
-    bodyTouchAction: '',
-	    htmlTouchAction: '',
-	    isLocked: false
-  });
-  const wordCardPointerStartRef = useRef({ x: 0, y: 0 });
-  const wordCardLongPressTimerRef = useRef(null);
-  const WORDCARD_LONG_PRESS_MS = 260;
-  const WORDCARD_CANCEL_MOVE_PX = 10;
-  const WORDCARD_START_DRAG_MOVE_PX = 2;
-
-  // Prevent iOS Safari scroll/gesture lock during active word-card drag
-  const wordCardPreventTouchMoveRef = useRef(null);
-  const wordCardPreventTouchMoveOptionsRef = useRef({ passive: false });
-  const wordCardPointerCaptureRef = useRef({ el: null, pointerId: null });
-
 
   // Загрузка данных из storage при загрузке
   useEffect(() => {
@@ -1200,58 +1179,6 @@ export default function FrenchFlashCardsApp() {
       setShowApiKeyModal(true);
     }
   }, []);
-  // ===== Persist current screen (topic) across refresh =====
-  const VIEW_STATE_KEY = "french_view_state_v1";
-  const viewStateRestoredRef = useRef(false);
-
-  useEffect(() => {
-    // Persist view state
-    try {
-      const payload = currentTopic
-        ? { screen: "topic", topicId: currentTopic.id, cardIndex: currentCardIndex || 0 }
-        : { screen: "topics" };
-      localStorage.setItem(VIEW_STATE_KEY, JSON.stringify(payload));
-    } catch (e) {}
-  }, [currentTopic, currentCardIndex]);
-
-  useEffect(() => {
-    // Restore view state once topics have loaded
-    if (loading) return;
-    if (viewStateRestoredRef.current) return;
-    viewStateRestoredRef.current = true;
-
-    try {
-      const raw = localStorage.getItem(VIEW_STATE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (!saved || saved.screen !== "topic") return;
-
-      const topicId = Number(saved.topicId);
-      const found = topics.find(t => Number(t.id) === topicId);
-      if (found) {
-        setCurrentTopic(found);
-        const idx = Number(saved.cardIndex);
-        setCurrentCardIndex(Number.isFinite(idx) ? idx : 0);
-        setFlipped(false);
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, [loading, topics]);
-
-
-  // Close modals on ESC
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key !== 'Escape') return;
-      if (showCelebrationModal) setShowCelebrationModal(false);
-      if (showApiKeyModal) setShowApiKeyModal(false);
-      if (showLoginModal) setShowLoginModal(false);
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showCelebrationModal, showApiKeyModal, showLoginModal]);
 
   // Глобальные обработчики для drag-drop на странице
   useEffect(() => {
@@ -1322,18 +1249,6 @@ export default function FrenchFlashCardsApp() {
       };
     }
   }, [currentTopic]);
-
-  // When navigating into a topic (or restoring it after refresh), ensure the user starts at the top.
-  useEffect(() => {
-    if (!currentTopic) return;
-    try {
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-      });
-    } catch (_) {
-      // no-op
-    }
-  }, [currentTopic?.id]);
 
   // ========== API CONFIG ==========
 
@@ -1999,105 +1914,56 @@ export default function FrenchFlashCardsApp() {
 
   // Drag and drop для тем на мобильных используя pointer events
   const handleTopicPointerDown = (e, topicId) => {
-    if (e.pointerType !== 'touch') return;
-
-    // Record initial touch position; allow normal scrolling until long-press activates drag
-    topicPointerStartRef.current = { x: e.clientX, y: e.clientY };
-    setPointerDownTopic(topicId);
-    setPointerDownTime(Date.now());
-    setTouchDragOverTopicId(null);
+    // Только для сенсорного ввода (touch)
+    if (e.pointerType === 'touch') {
+      setPointerDownTopic(topicId);
+      setPointerDownTime(Date.now());
+      setTouchDragTopicId(topicId);
+      console.log('Pointer down on topic:', topicId);
+    }
   };
 
   const handleTopicPointerMove = (e, topicId) => {
-    if (e.pointerType !== 'touch') return;
-
-    // If drag isn't active yet, decide whether to activate (long-press) or let the page scroll
-    if (!touchDragTopicId) {
-      if (!pointerDownTopic || !pointerDownTime) return;
-
-      const dx = e.clientX - topicPointerStartRef.current.x;
-      const dy = e.clientY - topicPointerStartRef.current.y;
-      const dist = Math.hypot(dx, dy);
-      const elapsed = Date.now() - pointerDownTime;
-
-      // If the user moves quickly before long-press, treat it as scrolling and cancel drag intent
-      if (elapsed < TOPIC_LONG_PRESS_MS && dist > TOPIC_CANCEL_MOVE_PX) {
-        setPointerDownTopic(null);
-        setPointerDownTime(null);
-        return;
-      }
-
-      // Activate drag only after long-press and a tiny movement
-      if (elapsed >= TOPIC_LONG_PRESS_MS && dist > TOPIC_START_DRAG_MOVE_PX) {
-        // Now we take over the gesture
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Keep receiving pointer events even outside the element
-        try {
-          e.currentTarget?.setPointerCapture?.(e.pointerId);
-        wordCardPointerCaptureRef.current = { el: e.currentTarget, pointerId: e.pointerId };
-        } catch (_) {}
-
-        // Lock page scroll during active drag
-        try {
-          const body = document.body;
-          const html = document.documentElement;
-          topicDragScrollLockRef.current.bodyOverflow = body.style.overflow;
-          topicDragScrollLockRef.current.bodyTouchAction = body.style.touchAction;
-          topicDragScrollLockRef.current.htmlTouchAction = html.style.touchAction;
-          body.style.overflow = 'hidden';
-          body.style.touchAction = 'none';
-          html.style.touchAction = 'none';
-        } catch (_) {}
-
-        setTouchDragTopicId(pointerDownTopic);
-        if (!suppressTopicClick) setSuppressTopicClick(true);
-      }
-
+    if (!touchDragTopicId || e.pointerType !== 'touch') {
       return;
     }
-
-    // Active drag: reorder
+    
     e.preventDefault();
-    e.stopPropagation();
-    if (!suppressTopicClick) setSuppressTopicClick(true);
-
+    
     try {
       const currentY = e.clientY;
-
+      
       const topicsList = document.querySelector('.topic-list-container');
       if (!topicsList) return;
-
+      
       const allTopicElements = Array.from(topicsList.querySelectorAll('.topic-item'));
       let foundElement = false;
-
+      
       for (let element of allTopicElements) {
         const rect = element.getBoundingClientRect();
         if (currentY >= rect.top && currentY <= rect.bottom) {
           foundElement = true;
-          const hoveredIdRaw = element.getAttribute('data-topic-id');
-          const hoveredId = hoveredIdRaw ? Number(hoveredIdRaw) : null;
-
+          const hoveredId = element.getAttribute('data-topic-id');
+          
           if (hoveredId && hoveredId !== touchDragTopicId) {
             const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
             const targetIndex = topics.findIndex(t => t.id === hoveredId);
-
+            
             if (draggedIndex !== -1 && targetIndex !== -1) {
               const newTopics = [...topics];
               const [draggedTopic] = newTopics.splice(draggedIndex, 1);
               newTopics.splice(targetIndex, 0, draggedTopic);
-
+              
               setTouchDragTopicId(draggedTopic.id);
               updateTopics(newTopics);
             }
           }
-
+          
           setTouchDragOverTopicId(hoveredId);
           break;
         }
       }
-
+      
       if (!foundElement) {
         setTouchDragOverTopicId(null);
       }
@@ -2107,33 +1973,14 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicPointerUp = (e) => {
-    if (e.pointerType !== 'touch') return;
-
-    if (touchDragTopicId) {
-      // Restore page scroll
-      try {
-        const body = document.body;
-        const html = document.documentElement;
-        body.style.overflow = topicDragScrollLockRef.current.bodyOverflow || '';
-        body.style.touchAction = topicDragScrollLockRef.current.bodyTouchAction || '';
-        html.style.touchAction = topicDragScrollLockRef.current.htmlTouchAction || '';
-      } catch (_) {}
-
+    if (e.pointerType === 'touch') {
+      console.log('Pointer up - clearing drag state');
+      setPointerDownTopic(null);
+      setPointerDownTime(null);
       setTouchDragTopicId(null);
       setTouchDragOverTopicId(null);
-
-      // Click event may fire after pointerup on mobile
-      setTimeout(() => setSuppressTopicClick(false), 200);
     }
-
-    setPointerDownTopic(null);
-    setPointerDownTime(null);
   };
-
-  const handleTopicPointerCancel = (e) => {
-    handleTopicPointerUp(e);
-  };
-
 
   // Drag and drop для карточек слов
   const handleCardDragStart = (e, cardIndex) => {
@@ -2155,203 +2002,26 @@ export default function FrenchFlashCardsApp() {
   const handleCardDrop = (e, targetCardIndex) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (!currentTopic) {
-      setDraggedCardIndex(null);
-      setDragOverCardIndex(null);
-      return;
-    }
-
+    
     if (draggedCardIndex !== null && draggedCardIndex !== targetCardIndex) {
-      const newCards = [...(currentTopic.cards || [])];
+      const newCards = [...cards];
       const [draggedCard] = newCards.splice(draggedCardIndex, 1);
       newCards.splice(targetCardIndex, 0, draggedCard);
-
-      const updatedTopics = topics.map(t =>
-        t.id === currentTopic.id ? { ...t, cards: newCards } : t
-      );
-      updateTopics(updatedTopics);
-      setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
+      
+      setCards(newCards);
+      
+      // Update cards in current topic
+      if (currentTopic) {
+        const updatedTopics = topics.map(t => 
+          t.id === currentTopic.id ? { ...t, cards: newCards } : t
+        );
+        updateTopics(updatedTopics);
+      }
     }
     
     setDraggedCardIndex(null);
     setDragOverCardIndex(null);
   };
-
-  // ===== Mobile long-press drag for WORD CARDS list (reorder) =====
-  const reorderWordCards = (fromIndex, toIndex) => {
-    if (!currentTopic || !Array.isArray(currentTopic.cards)) return;
-    if (fromIndex === null || toIndex === null) return;
-    if (fromIndex === toIndex) return;
-
-    const newCards = [...currentTopic.cards];
-    const [moved] = newCards.splice(fromIndex, 1);
-    newCards.splice(toIndex, 0, moved);
-
-    const updatedTopics = topics.map(t =>
-      t.id === currentTopic.id ? { ...t, cards: newCards } : t
-    );
-    updateTopics(updatedTopics);
-    setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
-  };
-
-  const handleWordCardPointerDown = (e, cardIndex) => {
-    if (e.pointerType !== 'touch') return;
-
-    // Ignore if user started on a button (e.g., delete)
-    const isButton = e.target && (e.target.closest?.('button') || e.target.closest?.('a') || e.target.closest?.('input'));
-    if (isButton) return;
-
-    setPointerDownWordCardIndex(cardIndex);
-    setPointerDownWordCardTime(Date.now());
-    wordCardPointerStartRef.current = { x: e.clientX, y: e.clientY };
-
-    // Setup long-press
-    if (wordCardLongPressTimerRef.current) {
-      clearTimeout(wordCardLongPressTimerRef.current);
-    }
-    wordCardLongPressTimerRef.current = setTimeout(() => {
-      // If finger still down on same card, start drag
-      setTouchDragWordCardIndex(cardIndex);
-
-      // Keep receiving pointer events
-      try {
-        e.currentTarget?.setPointerCapture?.(e.pointerId);
-        wordCardPointerCaptureRef.current = { el: e.currentTarget, pointerId: e.pointerId };
-      } catch (_) {}
-
-      // Lock page scroll during active drag (iOS-safe):
-      // Do NOT touch body/html overflow; Safari can get stuck after toggling overflow.
-      // Instead, block scrolling only while dragging via a non-passive touchmove listener.
-      try {
-	      wordCardDragScrollLockRef.current.isLocked = true;
-
-        if (!wordCardPreventTouchMoveRef.current) {
-          wordCardPreventTouchMoveRef.current = (ev) => {
-            ev.preventDefault();
-          };
-          const opts = wordCardPreventTouchMoveOptionsRef.current;
-          document.addEventListener('touchmove', wordCardPreventTouchMoveRef.current, opts);
-          window.addEventListener('touchmove', wordCardPreventTouchMoveRef.current, opts);
-        }
-      } catch (_) {}
-    }, WORDCARD_LONG_PRESS_MS);
-  };
-
-  const handleWordCardPointerMove = (e) => {
-    if (e.pointerType !== 'touch') return;
-
-    // Before drag: if user moved too much, cancel long-press (let scroll happen)
-    if (touchDragWordCardIndex === null) {
-      if (pointerDownWordCardIndex === null) return;
-
-      const dx = Math.abs(e.clientX - wordCardPointerStartRef.current.x);
-      const dy = Math.abs(e.clientY - wordCardPointerStartRef.current.y);
-      if (Math.max(dx, dy) > WORDCARD_CANCEL_MOVE_PX) {
-        if (wordCardLongPressTimerRef.current) {
-          clearTimeout(wordCardLongPressTimerRef.current);
-          wordCardLongPressTimerRef.current = null;
-        }
-        setPointerDownWordCardIndex(null);
-        setPointerDownWordCardTime(null);
-      }
-      return;
-    }
-
-    // Active drag: reorder
-    e.preventDefault();
-    e.stopPropagation();
-
-    try {
-      const currentY = e.clientY;
-      const list = document.querySelector('.word-cards-list-container');
-      if (!list) return;
-      const items = Array.from(list.querySelectorAll('.word-card-item'));
-
-      for (let el of items) {
-        const rect = el.getBoundingClientRect();
-        if (currentY >= rect.top && currentY <= rect.bottom) {
-          const hoveredRaw = el.getAttribute('data-card-index');
-          const hoveredIndex = hoveredRaw !== null ? Number(hoveredRaw) : null;
-          if (hoveredIndex !== null && hoveredIndex !== touchDragWordCardIndex) {
-            reorderWordCards(touchDragWordCardIndex, hoveredIndex);
-            setTouchDragWordCardIndex(hoveredIndex);
-          }
-          setTouchDragOverWordCardIndex(hoveredIndex);
-          break;
-        }
-      }
-    } catch (err) {
-      console.error('Error in handleWordCardPointerMove:', err);
-    }
-  };
-
-	  const endWordCardDrag = () => {
-    if (wordCardLongPressTimerRef.current) {
-      clearTimeout(wordCardLongPressTimerRef.current);
-      wordCardLongPressTimerRef.current = null;
-    }
-
-	  // Restore scrolling if we locked it (iOS-safe).
-	  if (wordCardDragScrollLockRef.current.isLocked) {
-      try {
-        // Remove our temporary touchmove blocker (use same options object)
-        if (wordCardPreventTouchMoveRef.current) {
-          const opts = wordCardPreventTouchMoveOptionsRef.current;
-          document.removeEventListener('touchmove', wordCardPreventTouchMoveRef.current, opts);
-          window.removeEventListener('touchmove', wordCardPreventTouchMoveRef.current, opts);
-          wordCardPreventTouchMoveRef.current = null;
-        }
-
-        // Release pointer capture if we took it
-        const cap = wordCardPointerCaptureRef.current;
-        if (cap?.el && cap.pointerId != null) {
-          try {
-            cap.el.releasePointerCapture?.(cap.pointerId);
-          } catch (_) {}
-        }
-        wordCardPointerCaptureRef.current = { el: null, pointerId: null };
-      } catch (_) {}
-      wordCardDragScrollLockRef.current.isLocked = false;
-    }
-
-    setTouchDragWordCardIndex(null);
-    setTouchDragOverWordCardIndex(null);
-    setPointerDownWordCardIndex(null);
-    setPointerDownWordCardTime(null);
-  };
-
-  const handleWordCardPointerUp = (e) => {
-    if (e.pointerType !== 'touch') return;
-    endWordCardDrag();
-  };
-
-  const handleWordCardPointerCancel = (e) => {
-    if (e.pointerType !== 'touch') return;
-    endWordCardDrag();
-  };
-
-	  // Safety net: sometimes mobile browsers don't deliver pointerup to the item (gesture/scroll interruption).
-	  // Ensure we always restore scrolling after a drag/long-press.
-	  useEffect(() => {
-	    const forceEnd = () => {
-	      if (!wordCardDragScrollLockRef.current.isLocked) return;
-	      endWordCardDrag();
-	    };
-
-	    window.addEventListener('pointerup', forceEnd, true);
-	    window.addEventListener('pointercancel', forceEnd, true);
-	    window.addEventListener('blur', forceEnd);
-	    document.addEventListener('visibilitychange', () => {
-	      if (document.hidden) forceEnd();
-	    });
-
-	    return () => {
-	      window.removeEventListener('pointerup', forceEnd, true);
-	      window.removeEventListener('pointercancel', forceEnd, true);
-	      window.removeEventListener('blur', forceEnd);
-	    };
-	  }, []);
 
   // Обработка свайпа и drag на мобильных устройствах
   const handleTouchStart = (e) => {
@@ -2741,6 +2411,7 @@ export default function FrenchFlashCardsApp() {
                     <div
                       key={topic.id}
                       data-topic-id={topic.id}
+                      className="topic-item"
                       draggable
                       onDragStart={(e) => {
                         handleTopicDragStart(e, topic.id);
@@ -2757,22 +2428,10 @@ export default function FrenchFlashCardsApp() {
                         handleTopicPointerMove(e, topic.id);
                       }}
                       onPointerUp={handleTopicPointerUp}
-                      onPointerCancel={handleTopicPointerCancel}
                       onClick={() => {
-                        if (suppressTopicClick) return;
                         setCurrentTopic(topic);
                         setCurrentCardIndex(0);
                         setFlipped(false);
-                        // Ensure we land at the top of the topic screen after navigation.
-                        // Using RAF + microtask makes this reliable across mobile browsers.
-                        try {
-                          requestAnimationFrame(() => {
-                            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-                            setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
-                          });
-                        } catch (_) {
-                          // no-op
-                        }
                       }}
                       style={{
                         border: (touchDragTopicId === topic.id || draggedTopicId === topic.id) 
@@ -2784,15 +2443,13 @@ export default function FrenchFlashCardsApp() {
                         opacity: (draggedTopicId === topic.id || touchDragTopicId === topic.id) ? 0.5 : 1,
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        // On mobile Safari, `manipulation` can swallow the first finger as a scroll gesture.
-                        // Keep it `none` so press-and-drag works reliably.
-                        touchAction: (touchDragTopicId ? 'none' : 'pan-y'),
+                        touchAction: 'manipulation',
                         pointerEvents: 'auto',
                         transition: 'all 0.15s ease',
                         borderRadius: '20px',
                         padding: '0.9rem',
                       }}
-                      className={`topic-item flex items-center gap-4 cursor-pointer hover:bg-black/2 ${touchDragTopicId === topic.id ? 'dragging' : ''}`}
+                      className="flex items-center gap-4 cursor-pointer hover:bg-black/2"
                     >
                       {/* Иконка список - зона для drag and drop */}
                       <svg 
@@ -2898,23 +2555,7 @@ export default function FrenchFlashCardsApp() {
             </div>
 
       {showApiKeyModal && (
-        <div
-          className="celebration-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowApiKeyModal(false);
-              setApiKeyError('');
-              setTempApiKey(apiKey || '');
-            }
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowApiKeyModal(false);
-              setApiKeyError('');
-              setTempApiKey(apiKey || '');
-            }
-          }}
-          style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -3188,20 +2829,7 @@ export default function FrenchFlashCardsApp() {
 
       {/* Login Modal */}
       {showLoginModal && (
-        <div
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLoginModal(false);
-              setTempLoginUserId(loginUserId || '');
-            }
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLoginModal(false);
-              setTempLoginUserId(loginUserId || '');
-            }
-          }}
-          style={{
+        <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -3454,15 +3082,7 @@ export default function FrenchFlashCardsApp() {
 
       {/* Celebration Modal */}
       {showCelebrationModal && (
-        <div
-          className="celebration-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setShowCelebrationModal(false);
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) setShowCelebrationModal(false);
-          }}
-          style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -4387,37 +4007,18 @@ export default function FrenchFlashCardsApp() {
               }} className="text-black unified-section-header">
                 {cards.length} {cards.length === 1 ? 'word' : 'words'}
               </h2>
-              <div className="flex flex-col word-cards-list-container" style={{ gap: '12px' }}>
+              <div className="flex flex-col" style={{ gap: '12px' }}>
                 {cards.map((card, idx) => (
                   <div
                     key={idx}
-                    data-card-index={idx}
-                    draggable={true}
-                    onDragStart={(e) => handleCardDragStart(e, idx)}
-                    onDragOver={(e) => handleCardDragOver(e, idx)}
-                    onDragLeave={handleCardDragLeave}
-                    onDrop={(e) => handleCardDrop(e, idx)}
-                    onDragEnd={() => {
-                      setDraggedCardIndex(null);
-                      setDragOverCardIndex(null);
-                    }}
-                    onPointerDown={(e) => handleWordCardPointerDown(e, idx)}
-                    onPointerMove={handleWordCardPointerMove}
-                    onPointerUp={handleWordCardPointerUp}
-                    onPointerCancel={handleWordCardPointerCancel}
                     style={{
                       border: '1.5px solid rgba(0, 0, 0, 0.08)',
                       boxSizing: 'border-box',
                       borderRadius: '20px',
                       overflow: 'visible',
                       padding: '0.9rem',
-                      opacity: (touchDragWordCardIndex === idx || draggedCardIndex === idx) ? 0.6 : 1,
-                      border: (dragOverCardIndex === idx || touchDragOverWordCardIndex === idx) 
-                        ? '1.5px solid rgba(0, 0, 0, 0.28)'
-                        : '1.5px solid rgba(0, 0, 0, 0.08)',
-                      touchAction: (touchDragWordCardIndex ? 'none' : 'pan-y'),
                     }}
-                    className={`word-card-item flex items-center gap-4 cursor-pointer hover:bg-black/2 transition ${touchDragWordCardIndex === idx ? 'dragging' : ''}`}
+                    className="flex items-center gap-4 cursor-pointer hover:bg-black/2 transition"
                   >
                     {/* Left icon */}
                     <svg 
@@ -4458,21 +4059,6 @@ export default function FrenchFlashCardsApp() {
 
                     {/* Delete button */}
                     <button
-                      // Drag should work anywhere on the card EXCEPT the delete button.
-                      // On iOS, pointerdown on the button can bubble and start the long-press drag on the parent.
-                      // We stop propagation on pointer/touch events to keep delete fully clickable.
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                      }}
-                      onPointerUp={(e) => {
-                        e.stopPropagation();
-                      }}
-                      onPointerCancel={(e) => {
-                        e.stopPropagation();
-                      }}
-                      onTouchStart={(e) => {
-                        e.stopPropagation();
-                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
@@ -4509,23 +4095,7 @@ export default function FrenchFlashCardsApp() {
 
     {/* API Key Modal on Topic Page */}
     {showApiKeyModal && (
-        <div
-          className="celebration-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowApiKeyModal(false);
-              setApiKeyError('');
-              setTempApiKey(apiKey || '');
-            }
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowApiKeyModal(false);
-              setApiKeyError('');
-              setTempApiKey(apiKey || '');
-            }
-          }}
-          style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -4793,21 +4363,7 @@ export default function FrenchFlashCardsApp() {
 
     {/* Login Modal on Topic Page */}
     {showLoginModal && (
-        <div
-          className="celebration-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLoginModal(false);
-              setTempLoginUserId(loginUserId || '');
-            }
-          }}
-          onTouchStart={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLoginModal(false);
-              setTempLoginUserId(loginUserId || '');
-            }
-          }}
-          style={{
+        <div className="celebration-modal-overlay" style={{
           position: 'fixed',
           top: 0,
           left: 0,
