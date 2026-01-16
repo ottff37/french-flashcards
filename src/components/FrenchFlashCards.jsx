@@ -59,12 +59,21 @@ if (typeof document !== 'undefined') {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
-      /* Needed for reliable pointer/touch move events on mobile during reordering */
+      /* Allow normal vertical scrolling; we enable drag after long-press */
+      touch-action: pan-y;
+    }
+
+    .topic-item.dragging {
+      /* During active reordering we fully take over the gesture */
       touch-action: none;
     }
 
-    /* If the finger starts on an inner element (icon/text), still keep pointer events flowing */
+    /* Inner elements should not block scrolling by default */
     .topic-item * {
+      touch-action: pan-y;
+    }
+
+    .topic-item.dragging * {
       touch-action: none;
     }
     
@@ -1169,6 +1178,13 @@ export default function FrenchFlashCardsApp() {
     htmlTouchAction: ''
   });
 
+  // Long-press drag support for mobile topic reordering (keeps normal scrolling)
+  const topicPointerStartRef = useRef({ x: 0, y: 0 });
+  const TOPIC_LONG_PRESS_MS = 260;
+  const TOPIC_CANCEL_MOVE_PX = 10;
+  const TOPIC_START_DRAG_MOVE_PX = 2;
+
+
   // Загрузка данных из storage при загрузке
   useEffect(() => {
     loadTopics();
@@ -1917,85 +1933,104 @@ export default function FrenchFlashCardsApp() {
 
   // Drag and drop для тем на мобильных используя pointer events
   const handleTopicPointerDown = (e, topicId) => {
-    // Только для сенсорного ввода (touch)
-    if (e.pointerType === 'touch') {
-      // Stop the browser from turning this into a scroll gesture
-      e.preventDefault();
-      e.stopPropagation();
+    if (e.pointerType !== 'touch') return;
 
-      // Keep receiving pointer move/up even when the finger leaves the element
-      try {
-        e.currentTarget?.setPointerCapture?.(e.pointerId);
-      } catch (_) {
-        // ignore
-      }
-
-      // Temporarily lock page scroll (iOS Safari otherwise captures the first finger as scrolling)
-      try {
-        const body = document.body;
-        const html = document.documentElement;
-        topicDragScrollLockRef.current.bodyOverflow = body.style.overflow;
-        topicDragScrollLockRef.current.bodyTouchAction = body.style.touchAction;
-        topicDragScrollLockRef.current.htmlTouchAction = html.style.touchAction;
-        body.style.overflow = 'hidden';
-        body.style.touchAction = 'none';
-        html.style.touchAction = 'none';
-      } catch (_) {
-        // ignore
-      }
-
-      setPointerDownTopic(topicId);
-      setPointerDownTime(Date.now());
-      setTouchDragTopicId(topicId);
-      console.log('Pointer down on topic:', topicId);
-    }
+    // Record initial touch position; allow normal scrolling until long-press activates drag
+    topicPointerStartRef.current = { x: e.clientX, y: e.clientY };
+    setPointerDownTopic(topicId);
+    setPointerDownTime(Date.now());
+    setTouchDragOverTopicId(null);
   };
 
   const handleTopicPointerMove = (e, topicId) => {
-    if (!touchDragTopicId || e.pointerType !== 'touch') {
+    if (e.pointerType !== 'touch') return;
+
+    // If drag isn't active yet, decide whether to activate (long-press) or let the page scroll
+    if (!touchDragTopicId) {
+      if (!pointerDownTopic || !pointerDownTime) return;
+
+      const dx = e.clientX - topicPointerStartRef.current.x;
+      const dy = e.clientY - topicPointerStartRef.current.y;
+      const dist = Math.hypot(dx, dy);
+      const elapsed = Date.now() - pointerDownTime;
+
+      // If the user moves quickly before long-press, treat it as scrolling and cancel drag intent
+      if (elapsed < TOPIC_LONG_PRESS_MS && dist > TOPIC_CANCEL_MOVE_PX) {
+        setPointerDownTopic(null);
+        setPointerDownTime(null);
+        return;
+      }
+
+      // Activate drag only after long-press and a tiny movement
+      if (elapsed >= TOPIC_LONG_PRESS_MS && dist > TOPIC_START_DRAG_MOVE_PX) {
+        // Now we take over the gesture
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Keep receiving pointer events even outside the element
+        try {
+          e.currentTarget?.setPointerCapture?.(e.pointerId);
+        } catch (_) {}
+
+        // Lock page scroll during active drag
+        try {
+          const body = document.body;
+          const html = document.documentElement;
+          topicDragScrollLockRef.current.bodyOverflow = body.style.overflow;
+          topicDragScrollLockRef.current.bodyTouchAction = body.style.touchAction;
+          topicDragScrollLockRef.current.htmlTouchAction = html.style.touchAction;
+          body.style.overflow = 'hidden';
+          body.style.touchAction = 'none';
+          html.style.touchAction = 'none';
+        } catch (_) {}
+
+        setTouchDragTopicId(pointerDownTopic);
+        if (!suppressTopicClick) setSuppressTopicClick(true);
+      }
+
       return;
     }
-    
+
+    // Active drag: reorder
     e.preventDefault();
     e.stopPropagation();
-    // Prevent accidental "open topic" clicks right after reordering
     if (!suppressTopicClick) setSuppressTopicClick(true);
-    
+
     try {
       const currentY = e.clientY;
-      
+
       const topicsList = document.querySelector('.topic-list-container');
       if (!topicsList) return;
-      
+
       const allTopicElements = Array.from(topicsList.querySelectorAll('.topic-item'));
       let foundElement = false;
-      
+
       for (let element of allTopicElements) {
         const rect = element.getBoundingClientRect();
         if (currentY >= rect.top && currentY <= rect.bottom) {
           foundElement = true;
           const hoveredIdRaw = element.getAttribute('data-topic-id');
           const hoveredId = hoveredIdRaw ? Number(hoveredIdRaw) : null;
-          
+
           if (hoveredId && hoveredId !== touchDragTopicId) {
             const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
             const targetIndex = topics.findIndex(t => t.id === hoveredId);
-            
+
             if (draggedIndex !== -1 && targetIndex !== -1) {
               const newTopics = [...topics];
               const [draggedTopic] = newTopics.splice(draggedIndex, 1);
               newTopics.splice(targetIndex, 0, draggedTopic);
-              
+
               setTouchDragTopicId(draggedTopic.id);
               updateTopics(newTopics);
             }
           }
-          
+
           setTouchDragOverTopicId(hoveredId);
           break;
         }
       }
-      
+
       if (!foundElement) {
         setTouchDragOverTopicId(null);
       }
@@ -2005,7 +2040,9 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicPointerUp = (e) => {
-    if (e.pointerType === 'touch') {
+    if (e.pointerType !== 'touch') return;
+
+    if (touchDragTopicId) {
       // Restore page scroll
       try {
         const body = document.body;
@@ -2013,20 +2050,23 @@ export default function FrenchFlashCardsApp() {
         body.style.overflow = topicDragScrollLockRef.current.bodyOverflow || '';
         body.style.touchAction = topicDragScrollLockRef.current.bodyTouchAction || '';
         html.style.touchAction = topicDragScrollLockRef.current.htmlTouchAction || '';
-      } catch (_) {
-        // ignore
-      }
+      } catch (_) {}
 
-      console.log('Pointer up - clearing drag state');
-      setPointerDownTopic(null);
-      setPointerDownTime(null);
       setTouchDragTopicId(null);
       setTouchDragOverTopicId(null);
 
       // Click event may fire after pointerup on mobile
       setTimeout(() => setSuppressTopicClick(false), 200);
     }
+
+    setPointerDownTopic(null);
+    setPointerDownTime(null);
   };
+
+  const handleTopicPointerCancel = (e) => {
+    handleTopicPointerUp(e);
+  };
+
 
   // Drag and drop для карточек слов
   const handleCardDragStart = (e, cardIndex) => {
@@ -2475,13 +2515,13 @@ export default function FrenchFlashCardsApp() {
                         handleTopicPointerMove(e, topic.id);
                       }}
                       onPointerUp={handleTopicPointerUp}
+                      onPointerCancel={handleTopicPointerCancel}
                       onClick={() => {
                         if (suppressTopicClick) return;
                         setCurrentTopic(topic);
                         setCurrentCardIndex(0);
                         setFlipped(false);
                       }}
-                      onPointerCancel={handleTopicPointerUp}
                       style={{
                         border: (touchDragTopicId === topic.id || draggedTopicId === topic.id) 
                           ? '2px dashed rgba(0, 0, 0, 0.3)' 
@@ -2494,13 +2534,13 @@ export default function FrenchFlashCardsApp() {
                         WebkitUserSelect: 'none',
                         // On mobile Safari, `manipulation` can swallow the first finger as a scroll gesture.
                         // Keep it `none` so press-and-drag works reliably.
-                        touchAction: 'none',
+                        touchAction: (touchDragTopicId ? 'none' : 'pan-y'),
                         pointerEvents: 'auto',
                         transition: 'all 0.15s ease',
                         borderRadius: '20px',
                         padding: '0.9rem',
                       }}
-                      className="topic-item flex items-center gap-4 cursor-pointer hover:bg-black/2"
+                      className={`topic-item flex items-center gap-4 cursor-pointer hover:bg-black/2 ${touchDragTopicId === topic.id ? 'dragging' : ''}`}
                     >
                       {/* Иконка список - зона для drag and drop */}
                       <svg 
