@@ -777,64 +777,53 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
     });
     
     // Объединяем все формы в одну строку
+    // Важно: Gemini часто возвращает варианты местоимений: j', il, elle, ils, elles, il/elle, ils/elles
+    // и иногда без запятых/переносов. Поэтому делаем более устойчивый парсер.
     let text = forms.join(' ').trim();
     
-    // Пытаемся разбить по запятым если они есть
-    if (text.includes(',')) {
-      const parts = text.split(',').map(p => p.trim()).filter(p => p);
-      
-      parts.forEach((part) => {
-        for (const pronoun of pronouns) {
-          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
-          if (regex.test(part)) {
-            const verbForm = part.replace(regex, '').trim();
-            result[pronoun.toLowerCase()] = verbForm;
-            return;
-          }
-        }
-      });
+    // Нормализуем апострофы (j’ -> j')
+    text = text.replace(/[’`]/g, "'");
+
+    // Превращаем разные варианты местоимений в канонические маркеры
+    // Используем границу (начало/пробел/запятая/точка с запятой/перенос)
+    const toMarkers = (t) => {
+      let s = ` ${t} `;
+      s = s.replace(/(^|[\s,;\n])j\s*'/gi, '$1||je|| ');
+      s = s.replace(/(^|[\s,;\n])je\b/gi, '$1||je|| ');
+      s = s.replace(/(^|[\s,;\n])tu\b/gi, '$1||tu|| ');
+      s = s.replace(/(^|[\s,;\n])il\s*\/\s*elle\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])il\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])elle\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])nous\b/gi, '$1||nous|| ');
+      s = s.replace(/(^|[\s,;\n])vous\b/gi, '$1||vous|| ');
+      s = s.replace(/(^|[\s,;\n])ils\s*\/\s*elles\b/gi, '$1||ils/elles|| ');
+      s = s.replace(/(^|[\s,;\n])ils\b/gi, '$1||ils/elles|| ');
+      s = s.replace(/(^|[\s,;\n])elles\b/gi, '$1||ils/elles|| ');
+      return s;
+    };
+
+    const marked = toMarkers(text);
+    const markerRe = /\|\|(je|tu|il\/elle|nous|vous|ils\/elles)\|\|/g;
+    const matches = Array.from(marked.matchAll(markerRe));
+
+    if (matches.length === 0) {
+      // Если не нашли вообще местоимений, кладём весь текст в je
+      result.je = text;
     } else {
-      // Если нет запятых, ищем местоимения в тексте последовательно
-      let searchText = text;
-      
-      // Сначала ищем все позиции местоимений
-      const pronounPositions = [];
-      for (const pronoun of pronouns) {
-        const regex = new RegExp(`${pronoun}\\s+`, 'i');
-        const match = regex.exec(searchText);
-        
-        if (match) {
-          pronounPositions.push({
-            pronoun: pronoun.toLowerCase(),
-            index: match.index,
-            endIndex: match.index + match[0].length
-          });
-        }
-      }
-      
-      // Если нет местоимений вообще, добавляем всё как "je"
-      if (pronounPositions.length === 0) {
-        result['je'] = searchText;
-      } else {
-        // Сортируем по позиции
-        pronounPositions.sort((a, b) => a.index - b.index);
-        
-        // Если первый найденный текст не начинается с местоимения, добавляем "je"
-        if (pronounPositions[0].index > 0) {
-          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
-          result['je'] = jeForm;
-        }
-        
-        // Извлекаем формы между местоимениями
-        for (let i = 0; i < pronounPositions.length; i++) {
-          const current = pronounPositions[i];
-          const next = pronounPositions[i + 1];
-          
-          const startIdx = current.endIndex;
-          const endIdx = next ? next.index : searchText.length;
-          const verbForm = searchText.substring(startIdx, endIdx).trim();
-          
-          result[current.pronoun] = verbForm;
+      for (let i = 0; i < matches.length; i++) {
+        const key = matches[i][1];
+        const start = matches[i].index + matches[i][0].length;
+        const end = (i + 1 < matches.length) ? matches[i + 1].index : marked.length;
+        let formText = marked.slice(start, end).trim();
+
+        // Чистим возможные разделители
+        formText = formText.replace(/^[:\-–—]+\s*/, '');
+        formText = formText.replace(/^[,;]+\s*/, '');
+        formText = formText.replace(/[\s,;]+$/g, '');
+
+        if (formText) {
+          // Не перезаписываем уже заполненное (если, например, Gemini повторил местоимение)
+          if (!result[key]) result[key] = formText;
         }
       }
     }
@@ -985,64 +974,53 @@ const ConjugationTable = ({ conjugation, word }) => {
     });
     
     // Объединяем все формы в одну строку
+    // Важно: Gemini часто возвращает варианты местоимений: j', il, elle, ils, elles, il/elle, ils/elles
+    // и иногда без запятых/переносов. Поэтому делаем более устойчивый парсер.
     let text = forms.join(' ').trim();
-    
-    // Пытаемся разбить по запятым если они есть
-    if (text.includes(',')) {
-      const parts = text.split(',').map(p => p.trim()).filter(p => p);
-      
-      parts.forEach((part) => {
-        for (const pronoun of pronouns) {
-          const regex = new RegExp(`^\\s*${pronoun}\\s+`, 'i');
-          if (regex.test(part)) {
-            const verbForm = part.replace(regex, '').trim();
-            result[pronoun.toLowerCase()] = verbForm;
-            return;
-          }
-        }
-      });
+
+    // Нормализуем апострофы (j’ -> j')
+    text = text.replace(/[’`]/g, "'");
+
+    // Превращаем разные варианты местоимений в канонические маркеры
+    // Используем границу (начало/пробел/запятая/точка с запятой/перенос)
+    const toMarkers = (t) => {
+      let s = ` ${t} `;
+      s = s.replace(/(^|[\s,;\n])j\s*'/gi, '$1||je|| ');
+      s = s.replace(/(^|[\s,;\n])je\b/gi, '$1||je|| ');
+      s = s.replace(/(^|[\s,;\n])tu\b/gi, '$1||tu|| ');
+      s = s.replace(/(^|[\s,;\n])il\s*\/\s*elle\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])il\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])elle\b/gi, '$1||il/elle|| ');
+      s = s.replace(/(^|[\s,;\n])nous\b/gi, '$1||nous|| ');
+      s = s.replace(/(^|[\s,;\n])vous\b/gi, '$1||vous|| ');
+      s = s.replace(/(^|[\s,;\n])ils\s*\/\s*elles\b/gi, '$1||ils/elles|| ');
+      s = s.replace(/(^|[\s,;\n])ils\b/gi, '$1||ils/elles|| ');
+      s = s.replace(/(^|[\s,;\n])elles\b/gi, '$1||ils/elles|| ');
+      return s;
+    };
+
+    const marked = toMarkers(text);
+    const markerRe = /\|\|(je|tu|il\/elle|nous|vous|ils\/elles)\|\|/g;
+    const matches = Array.from(marked.matchAll(markerRe));
+
+    if (matches.length === 0) {
+      // Если не нашли вообще местоимений, кладём весь текст в je
+      result.je = text;
     } else {
-      // Если нет запятых, ищем местоимения в тексте последовательно
-      let searchText = text;
-      
-      // Сначала ищем все позиции местоимений
-      const pronounPositions = [];
-      for (const pronoun of pronouns) {
-        const regex = new RegExp(`${pronoun}\\s+`, 'i');
-        const match = regex.exec(searchText);
-        
-        if (match) {
-          pronounPositions.push({
-            pronoun: pronoun.toLowerCase(),
-            index: match.index,
-            endIndex: match.index + match[0].length
-          });
-        }
-      }
-      
-      // Если нет местоимений вообще, добавляем всё как "je"
-      if (pronounPositions.length === 0) {
-        result['je'] = searchText;
-      } else {
-        // Сортируем по позиции
-        pronounPositions.sort((a, b) => a.index - b.index);
-        
-        // Если первый найденный текст не начинается с местоимения, добавляем "je"
-        if (pronounPositions[0].index > 0) {
-          const jeForm = searchText.substring(0, pronounPositions[0].index).trim();
-          result['je'] = jeForm;
-        }
-        
-        // Извлекаем формы между местоимениями
-        for (let i = 0; i < pronounPositions.length; i++) {
-          const current = pronounPositions[i];
-          const next = pronounPositions[i + 1];
-          
-          const startIdx = current.endIndex;
-          const endIdx = next ? next.index : searchText.length;
-          const verbForm = searchText.substring(startIdx, endIdx).trim();
-          
-          result[current.pronoun] = verbForm;
+      for (let i = 0; i < matches.length; i++) {
+        const key = matches[i][1];
+        const start = matches[i].index + matches[i][0].length;
+        const end = (i + 1 < matches.length) ? matches[i + 1].index : marked.length;
+        let formText = marked.slice(start, end).trim();
+
+        // Чистим возможные разделители
+        formText = formText.replace(/^[:\-–—]+\s*/, '');
+        formText = formText.replace(/^[,;]+\s*/, '');
+        formText = formText.replace(/[\s,;]+$/g, '');
+
+        if (formText) {
+          // Не перезаписываем уже заполненное (если, например, Gemini повторил местоимение)
+          if (!result[key]) result[key] = formText;
         }
       }
     }
