@@ -1814,6 +1814,12 @@ export default function FrenchFlashCardsApp() {
     } else {
       // Ensure keyboard doesn't pop on mobile
       hideKeyboard();
+      // Scroll to top to show search form on mobile
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      } catch (e) {
+        window.scrollTo(0, 0);
+      }
     }
   };
 
