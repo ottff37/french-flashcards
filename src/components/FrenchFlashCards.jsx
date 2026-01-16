@@ -668,7 +668,20 @@ if (typeof document !== 'undefined') {
         transform: none !important;
       }
     }
-    
+    /* === Capitalize Russian text (display only) === */
+.russian-word,
+.word-translation,
+.word-title,
+.word-title-ru {
+  text-transform: capitalize;
+}
+
+/* Inline-styled Russian titles/subtitles */
+p[style*="font-size: 32px"],
+p[style*="font-size: 14px"] {
+  text-transform: capitalize;
+}
+
 `;
   document.head.appendChild(style);
 }
