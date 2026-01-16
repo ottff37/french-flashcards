@@ -1203,6 +1203,10 @@ export default function FrenchFlashCardsApp() {
   const WORDCARD_CANCEL_MOVE_PX = 10;
   const WORDCARD_START_DRAG_MOVE_PX = 2;
 
+  // Prevent iOS Safari scroll/gesture lock during active word-card drag
+  const wordCardPreventTouchMoveRef = useRef(null);
+  const wordCardPointerCaptureRef = useRef({ el: null, pointerId: null });
+
 
   // Загрузка данных из storage при загрузке
   useEffect(() => {
@@ -2002,6 +2006,7 @@ export default function FrenchFlashCardsApp() {
         // Keep receiving pointer events even outside the element
         try {
           e.currentTarget?.setPointerCapture?.(e.pointerId);
+        wordCardPointerCaptureRef.current = { el: e.currentTarget, pointerId: e.pointerId };
         } catch (_) {}
 
         // Lock page scroll during active drag
@@ -2182,6 +2187,7 @@ export default function FrenchFlashCardsApp() {
       // Keep receiving pointer events
       try {
         e.currentTarget?.setPointerCapture?.(e.pointerId);
+        wordCardPointerCaptureRef.current = { el: e.currentTarget, pointerId: e.pointerId };
       } catch (_) {}
 
       // Lock page scroll during active drag
@@ -2192,9 +2198,18 @@ export default function FrenchFlashCardsApp() {
         wordCardDragScrollLockRef.current.bodyTouchAction = body.style.touchAction;
         wordCardDragScrollLockRef.current.htmlTouchAction = html.style.touchAction;
 	        wordCardDragScrollLockRef.current.isLocked = true;
-        body.style.overflow = 'hidden';
+        // Instead of forcing overflow:hidden (which can leave iOS Safari stuck),
+        // we prevent scrolling via a non-passive touchmove listener while dragging.
         body.style.touchAction = 'none';
         html.style.touchAction = 'none';
+
+        if (!wordCardPreventTouchMoveRef.current) {
+          wordCardPreventTouchMoveRef.current = (ev) => {
+            // Block page scroll while actively reordering
+            ev.preventDefault();
+          };
+          document.addEventListener('touchmove', wordCardPreventTouchMoveRef.current, { passive: false });
+        }
       } catch (_) {}
     }, WORDCARD_LONG_PRESS_MS);
   };
@@ -2260,16 +2275,32 @@ export default function FrenchFlashCardsApp() {
       try {
         const body = document.body;
         const html = document.documentElement;
+
+        // Restore previous inline styles
         body.style.overflow = wordCardDragScrollLockRef.current.bodyOverflow || '';
         body.style.touchAction = wordCardDragScrollLockRef.current.bodyTouchAction || '';
         html.style.touchAction = wordCardDragScrollLockRef.current.htmlTouchAction || '';
 
-        // Hard reset (fixes cases where pointerup is delivered late / gesture state leaks)
-        body.style.overflow = '';
+        // Remove our temporary touchmove blocker
+        if (wordCardPreventTouchMoveRef.current) {
+          document.removeEventListener('touchmove', wordCardPreventTouchMoveRef.current);
+          wordCardPreventTouchMoveRef.current = null;
+        }
+
+        // Release pointer capture if we took it
+        const cap = wordCardPointerCaptureRef.current;
+        if (cap?.el && cap.pointerId != null) {
+          try {
+            cap.el.releasePointerCapture?.(cap.pointerId);
+          } catch (_) {}
+        }
+        wordCardPointerCaptureRef.current = { el: null, pointerId: null };
+
+        // Extra safety for iOS: ensure defaults are back
         body.style.touchAction = '';
         html.style.touchAction = '';
       } catch (_) {}
-	      wordCardDragScrollLockRef.current.isLocked = false;
+      wordCardDragScrollLockRef.current.isLocked = false;
     }
 
     setTouchDragWordCardIndex(null);
