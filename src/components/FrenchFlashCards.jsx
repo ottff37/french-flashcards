@@ -1254,7 +1254,21 @@ export default function FrenchFlashCardsApp() {
     }
   }, [currentTopic]);
 
-  // ========== API CONFIG ==========
+  
+  // Scroll to top when opening a topic (mobile-friendly)
+  useEffect(() => {
+    if (currentTopic && currentTopic.id) {
+      requestAnimationFrame(() => {
+        try {
+          window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        } catch (e) {
+          window.scrollTo(0, 0);
+        }
+      });
+    }
+  }, [currentTopic?.id]);
+
+// ========== API CONFIG ==========
 
   // Helper функция для запроса к Claude API напрямую
   const callGeminiAPI = async (prompt) => {
@@ -1948,10 +1962,11 @@ export default function FrenchFlashCardsApp() {
         if (currentY >= rect.top && currentY <= rect.bottom) {
           foundElement = true;
           const hoveredId = element.getAttribute('data-topic-id');
-          
-          if (hoveredId && hoveredId !== touchDragTopicId) {
+          const hoveredIdNum = hoveredId ? Number(hoveredId) : null;
+
+          if (hoveredIdNum != null && hoveredIdNum !== touchDragTopicId) {
             const draggedIndex = topics.findIndex(t => t.id === touchDragTopicId);
-            const targetIndex = topics.findIndex(t => t.id === hoveredId);
+            const targetIndex = topics.findIndex(t => t.id === hoveredIdNum);
             
             if (draggedIndex !== -1 && targetIndex !== -1) {
               const newTopics = [...topics];
@@ -1963,7 +1978,7 @@ export default function FrenchFlashCardsApp() {
             }
           }
           
-          setTouchDragOverTopicId(hoveredId);
+          setTouchDragOverTopicId(hoveredIdNum);
           break;
         }
       }
@@ -2036,6 +2051,8 @@ export default function FrenchFlashCardsApp() {
   const wordCardPointerIdRef = useRef(null);
   const wordCardPointerTargetRef = useRef(null);
   const wordCardScrollBlockerRef = useRef(null);
+  const wordCardStartIndexRef = useRef(null);
+  const wordCardHoverIndexRef = useRef(null);
   // Use the same options object for add/remove on iOS Safari reliability
   const WORD_CARD_TOUCHMOVE_OPTIONS = useRef({ passive: false });
 
@@ -2100,6 +2117,10 @@ export default function FrenchFlashCardsApp() {
     wordCardPointerTargetRef.current = e.currentTarget;
     setTouchDraggedWordCardIndex(cardIndex);
 
+    // Track original index and current hover target (commit reorder on release for iOS stability)
+    wordCardStartIndexRef.current = cardIndex;
+    wordCardHoverIndexRef.current = cardIndex;
+
     // Capture pointer so we reliably receive move/up events
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -2130,19 +2151,8 @@ export default function FrenchFlashCardsApp() {
     if (Number.isNaN(hoveredIndex)) return;
     setTouchDragOverWordCardIndex(hoveredIndex);
 
-    if (hoveredIndex === touchDraggedWordCardIndex) return;
-
-    const newCards = [...currentTopic.cards];
-    const [dragged] = newCards.splice(touchDraggedWordCardIndex, 1);
-    newCards.splice(hoveredIndex, 0, dragged);
-
-    const updatedTopics = topics.map(t =>
-      t.id === currentTopic.id ? { ...t, cards: newCards } : t
-    );
-    updateTopics(updatedTopics);
-    setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
-
-    setTouchDraggedWordCardIndex(hoveredIndex);
+    // Only update hover state during drag; commit reorder on release (prevents iOS scroll lock/unmount issues)
+    wordCardHoverIndexRef.current = hoveredIndex;
   };
 
   const handleWordCardPointerUp = (e) => {
@@ -2160,6 +2170,30 @@ export default function FrenchFlashCardsApp() {
         e.currentTarget.releasePointerCapture(wordCardPointerIdRef.current);
       }
     } catch (_) {}
+
+
+    // Commit reorder on release (stable on iOS Safari)
+    try {
+      if (isTouchWordCardDragging && currentTopic && Array.isArray(currentTopic.cards)) {
+        const fromIdx = wordCardStartIndexRef.current;
+        const toIdx = wordCardHoverIndexRef.current;
+        if (fromIdx != null && toIdx != null && fromIdx !== toIdx) {
+          const newCards = [...currentTopic.cards];
+          const [dragged] = newCards.splice(fromIdx, 1);
+          newCards.splice(toIdx, 0, dragged);
+
+          const updatedTopics = topics.map(t =>
+            t.id === currentTopic.id ? { ...t, cards: newCards } : t
+          );
+          updateTopics(updatedTopics);
+          setCurrentTopic(prev => (prev ? { ...prev, cards: newCards } : prev));
+        }
+      }
+    } catch (_) {}
+
+    // Reset refs
+    wordCardStartIndexRef.current = null;
+    wordCardHoverIndexRef.current = null;
 
     cleanupWordCardTouchDrag();
   };
@@ -2553,7 +2587,6 @@ export default function FrenchFlashCardsApp() {
                     <div
                       key={topic.id}
                       data-topic-id={topic.id}
-                      className="topic-item"
                       draggable
                       onDragStart={(e) => {
                         handleTopicDragStart(e, topic.id);
@@ -2574,6 +2607,21 @@ export default function FrenchFlashCardsApp() {
                         setCurrentTopic(topic);
                         setCurrentCardIndex(0);
                         setFlipped(false);
+                        // Ensure we land at the top of the topic page after navigation
+                        requestAnimationFrame(() => {
+                          try {
+                            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                          } catch (e) {
+                            window.scrollTo(0, 0);
+                          }
+                        });
+                        setTimeout(() => {
+                          try {
+                            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                          } catch (e) {
+                            window.scrollTo(0, 0);
+                          }
+                        }, 0);
                       }}
                       style={{
                         border: (touchDragTopicId === topic.id || draggedTopicId === topic.id) 
@@ -2585,13 +2633,13 @@ export default function FrenchFlashCardsApp() {
                         opacity: (draggedTopicId === topic.id || touchDragTopicId === topic.id) ? 0.5 : 1,
                         userSelect: 'none',
                         WebkitUserSelect: 'none',
-                        touchAction: 'manipulation',
+                        touchAction: (touchDragTopicId || draggedTopicId) ? 'none' : 'pan-y',
                         pointerEvents: 'auto',
                         transition: 'all 0.15s ease',
                         borderRadius: '20px',
                         padding: '0.9rem',
                       }}
-                      className="flex items-center gap-4 cursor-pointer hover:bg-black/2"
+                      className="topic-item flex items-center gap-4 cursor-pointer hover:bg-black/2"
                     >
                       {/* Иконка список - зона для drag and drop */}
                       <svg 
