@@ -3407,15 +3407,14 @@ export default function FrenchFlashCardsApp() {
         .success-toast {
           animation: slideUp 0.3s ease-out;
         }
-      `}
-/* Russian word capitalization */
-.russian-word,
-.word-card-russian,
-.interactive-card-russian {
-  text-transform: capitalize;
-}
+			/* Russian word capitalization */
+			.russian-word,
+			.word-card-russian,
+			.interactive-card-russian {
+			  text-transform: capitalize;
+			}
 
-</style>
+		      `}</style>
 
       {/* Celebration Modal */}
       {showCelebrationModal && (
