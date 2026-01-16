@@ -876,6 +876,9 @@ const ConjugationTableWhite = ({ conjugation, word }) => {
       form = form.replace(/^[:\-–—]/, '').trim();
       form = form.replace(/^[,;]+/, '').trim();
 
+      // Remove trailing commas (Gemini sometimes returns forms like "Apprends,")
+      form = form.replace(/[,，]+\s*$/g, '').trim();
+
       result[cur.canonical] = form;
     }
 
@@ -1098,6 +1101,9 @@ const ConjugationTable = ({ conjugation, word }) => {
       // Clean common separators right after pronoun
       form = form.replace(/^[:\-–—]/, '').trim();
       form = form.replace(/^[,;]+/, '').trim();
+
+      // Remove trailing commas (Gemini sometimes returns forms like "Apprends,")
+      form = form.replace(/[,，]+\s*$/g, '').trim();
 
       result[cur.canonical] = form;
     }
