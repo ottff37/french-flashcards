@@ -55,7 +55,8 @@ if (typeof document !== 'undefined') {
       user-select: none;
     }
     
-    .topic-item {
+    .topic-item,
+    .topic-item * {
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
@@ -1170,6 +1171,17 @@ export default function FrenchFlashCardsApp() {
   const inputRef = useRef(null);
   const topicTitleRef = useRef(null);
 
+  // ===== Mobile long-press drag (TOPICS list) =====
+  // Keep normal scrolling; start drag only after a short hold.
+  const TOPIC_HOLD_MS = 260;
+  const topicHoldTimeoutRef = useRef(null);
+  const topicPointerIdRef = useRef(null);
+  const topicPointerTargetRef = useRef(null);
+  const topicDragActivatedRef = useRef(false);
+  const topicDragMovedRef = useRef(false);
+  const topicStartYRef = useRef(null);
+  const suppressNextTopicClickRef = useRef(0);
+
   // Загрузка данных из storage при загрузке
   useEffect(() => {
     loadTopics();
@@ -1932,20 +1944,58 @@ export default function FrenchFlashCardsApp() {
 
   // Drag and drop для тем на мобильных используя pointer events
   const handleTopicPointerDown = (e, topicId) => {
-    // Только для сенсорного ввода (touch)
-    if (e.pointerType === 'touch') {
-      setPointerDownTopic(topicId);
-      setPointerDownTime(Date.now());
-      setTouchDragTopicId(topicId);
-      console.log('Pointer down on topic:', topicId);
+    // Touch long-press to start dragging topics (keeps normal scrolling)
+    if (e.pointerType !== 'touch') return;
+
+    // If user pressed on delete button (or inside it) — don't start drag
+    const pressedDelete = e.target && e.target.closest && e.target.closest('button');
+    if (pressedDelete) return;
+
+    try {
+      // Capture pointer so move/up are reliable on iOS
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch (_) {}
+
+    setPointerDownTopic(topicId);
+    setPointerDownTime(Date.now());
+
+    // Start a hold timer; if user moves before it fires — we cancel and allow scroll
+    if (topicHoldTimeoutRef.current) {
+      clearTimeout(topicHoldTimeoutRef.current);
+      topicHoldTimeoutRef.current = null;
     }
+
+    topicPointerIdRef.current = e.pointerId;
+    topicPointerTargetRef.current = e.currentTarget;
+    topicDragActivatedRef.current = false;
+    topicDragMovedRef.current = false;
+    topicStartYRef.current = e.clientY;
+
+    topicHoldTimeoutRef.current = setTimeout(() => {
+      // Activate drag
+      topicDragActivatedRef.current = true;
+      setTouchDragTopicId(topicId);
+    }, TOPIC_HOLD_MS);
   };
 
   const handleTopicPointerMove = (e, topicId) => {
-    if (!touchDragTopicId || e.pointerType !== 'touch') {
+    if (e.pointerType !== 'touch') return;
+
+    // If hold hasn't activated yet — cancel drag if user starts scrolling
+    if (!topicDragActivatedRef.current) {
+      const dy = Math.abs(e.clientY - (topicStartYRef.current ?? e.clientY));
+      if (dy > 6) {
+        // User is scrolling; cancel hold-to-drag
+        if (topicHoldTimeoutRef.current) {
+          clearTimeout(topicHoldTimeoutRef.current);
+          topicHoldTimeoutRef.current = null;
+        }
+      }
       return;
     }
-    
+
+    // Drag activated
+    topicDragMovedRef.current = true;
     e.preventDefault();
     
     try {
@@ -1992,13 +2042,35 @@ export default function FrenchFlashCardsApp() {
   };
 
   const handleTopicPointerUp = (e) => {
-    if (e.pointerType === 'touch') {
-      console.log('Pointer up - clearing drag state');
-      setPointerDownTopic(null);
-      setPointerDownTime(null);
-      setTouchDragTopicId(null);
-      setTouchDragOverTopicId(null);
+    if (e.pointerType !== 'touch') return;
+
+    // Always clear hold timer
+    if (topicHoldTimeoutRef.current) {
+      clearTimeout(topicHoldTimeoutRef.current);
+      topicHoldTimeoutRef.current = null;
     }
+
+    // Release capture
+    try {
+      if (topicPointerTargetRef.current && topicPointerIdRef.current != null) {
+        topicPointerTargetRef.current.releasePointerCapture?.(topicPointerIdRef.current);
+      }
+    } catch (_) {}
+
+    // If we were dragging — suppress the click that may fire on iOS
+    if (topicDragActivatedRef.current && topicDragMovedRef.current) {
+      suppressNextTopicClickRef.current = Date.now();
+    }
+
+    topicPointerIdRef.current = null;
+    topicPointerTargetRef.current = null;
+    topicDragActivatedRef.current = false;
+    topicDragMovedRef.current = false;
+
+    setPointerDownTopic(null);
+    setPointerDownTime(null);
+    setTouchDragTopicId(null);
+    setTouchDragOverTopicId(null);
   };
 
   // Drag and drop для карточек слов
@@ -2607,7 +2679,12 @@ export default function FrenchFlashCardsApp() {
                         handleTopicPointerMove(e, topic.id);
                       }}
                       onPointerUp={handleTopicPointerUp}
+                      onPointerCancel={handleTopicPointerUp}
                       onClick={() => {
+                        // If a drag just happened, iOS may still fire a click after pointerup
+                        if (Date.now() - (suppressNextTopicClickRef.current || 0) < 450) {
+                          return;
+                        }
                         setCurrentTopic(topic);
                         setCurrentCardIndex(0);
                         setFlipped(false);
